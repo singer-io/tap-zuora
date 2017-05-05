@@ -3,20 +3,25 @@
 import csv
 import io
 import time
+from xml.etree import ElementTree
 
 import requests
 import singer
 
 from tap_zuora import utils
 
-
 BASE_URL = "https://rest.apisandbox.zuora.com/v1"
 REQUIRED_CONFIG_KEYS = ['start_date', 'api_key', 'api_secret']
 CONFIG = {}
 STATE = {}
+SCHEMAS = {}
 
 LOGGER = singer.get_logger()
 SESSION = requests.Session()
+
+
+def print_element(element):
+    print(ElementTree.tostring(element).decode('utf-8'))
 
 
 def request(method, url, **kwargs):
@@ -58,7 +63,10 @@ def get_export(entity, fields=None):
     LOGGER.info("Query: {}".format(zoql))
     resp = post("{}/object/export".format(BASE_URL), json=data)
 
-    # make sure we got a 200
+    if resp.status_code != 200:
+        print(resp.status_code)
+        print(resp.content)
+        raise Exception("API got mad")
 
     export_id = resp.json()["Id"]
 
@@ -78,8 +86,109 @@ def get_export(entity, fields=None):
     return csv.DictReader(f)
 
 
+def convert_key(key):
+    _, key = key.split(".", 1)
+    return key.lower()
+
+
+def convert_keys(row):
+    return {convert_key(k): v for k, v in row.items()}
+
+
+def format_value(value, type_):
+    if value == "":
+        return None
+
+    if type_ == "integer":
+        return int(value)
+    elif type_ == "float":
+        return float(value)
+    elif type_ == "datetime":
+        # nothing to do - we already have the correct dt format
+        return value
+    elif type_ == "boolean":
+        return value.lower() == "true"
+    else:
+        return value
+
+
+def format_values(entity, row):
+    entity_schema = SCHEMAS[entity]['fields']
+
+    rtn = {}
+    for key, value in row.items():
+        if key not in entity_schema:
+            continue
+
+        type_ = entity_schema[key]
+        rtn[key] = format_value(value, type_)
+
+    return rtn
+
+
+def gen_records(entity, fields=None):
+    reader = get_export(entity, fields)
+    for row in reader:
+        row = convert_keys(row)
+        row = format_values(entity, row)
+        yield row
+
+
+def get_entities():
+    xml_str = get("{}/describe".format(BASE_URL)).content
+    et = ElementTree.fromstring(xml_str)
+    return [t.text for t in et.findall('./object/name')]
+
+
+TYPE_MAP = {
+    "picklist": "string",
+    "text": "string",
+    "boolean": "boolean",
+    "integer": "integer",
+    "decimal": "float",
+    "date": "datetime",
+    "datetime": "datetime",
+}
+
+
+def get_field_schema(field_element):
+    # print_element(field_element)
+    name = field_element.find('name').text.lower()
+    type_ = TYPE_MAP.get(field_element.find('type').text, None)
+    return name, type_
+
+
+def get_schema(entity):
+    # print(entity)
+    xml_str = get("{}/describe/{}".format(BASE_URL, entity)).content
+    et = ElementTree.fromstring(xml_str)
+    fields = et.find('fields').getchildren()
+
+    field_dict = {}
+    for field in fields:
+        name, type_ = get_field_schema(field)
+        if type_ is None:
+            # TODO: log something
+            pass
+        else:
+            field_dict[name] = type_
+
+    return field_dict
+
+
+def get_schemas():
+    entities = get_entities()
+    schemas = {}
+    for entity in entities:
+        schemas[entity] = {
+            "fields": get_schema(entity),
+        }
+
+    return schemas
+
+
 def do_sync():
-    pass
+    SCHEMAS.update(get_schemas())
 
 
 def main():
