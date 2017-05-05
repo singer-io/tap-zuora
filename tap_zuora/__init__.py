@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import csv
+import io
 import time
 
 import requests
@@ -71,7 +73,9 @@ def get_export(entity, fields=None):
         raise Exception("Export didn't complete")
 
     resp = get("{}/files/{}".format(BASE_URL, file_id))
-    return resp.content
+    c = resp.content.decode('utf-8')
+    f = io.StringIO(c)
+    return csv.DictReader(f)
 
 
 def do_sync():
