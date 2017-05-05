@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csv
+import datetime
 import io
 import time
 from xml.etree import ElementTree
@@ -45,15 +46,46 @@ def post(url, **kwargs):
     return request('POST', url, **kwargs)
 
 
+def update_field_for_entity(entity):
+    if "updateddate" in SCHEMAS[entity]["fields"]:
+        return "UpdatedDate"
+    elif "transactiondate" in SCHEMAS[entity]["fields"]:
+        return "TransactionDate"
+    else:
+        return None
+
+
+def start_date_for_entity(entity):
+    if entity in STATE:
+        return STATE[entity]
+    else:
+        return CONFIG["start_date"]
+
+def get_where_clause(entity):
+    update_field = update_field_for_entity(entity)
+    if update_field is not None:
+        start_date = start_date_for_entity(entity)
+        end_date = utils.strftime(utils.strptime(start_date) + datetime.timedelta(days=1))
+        return ' where {update_field} >= "{start_date}" and {update_field} < "{end_date}"'.format(
+            update_field=update_field,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    else:
+        return ""
+
 def get_export(entity, fields=None):
     if fields:
         field_list = ", ".join(fields)
     else:
         field_list = "*"
 
-    zoql = "select {field_list} from {entity}".format(
+    # need the where clause here
+    zoql = "select {field_list} from {entity}{where}".format(
         field_list=field_list,
-        entity=entity)
+        entity=entity,
+        where=get_where_clause(entity),
+    )
 
     data = {
         "Format": "csv",
@@ -104,8 +136,13 @@ def format_value(value, type_):
     elif type_ == "float":
         return float(value)
     elif type_ == "datetime":
-        # nothing to do - we already have the correct dt format
-        return value
+        if "+" in value:
+            value, _ = value.split("+")
+            return value
+        else:
+            return value
+    elif type_ == "date":
+        return value + "T00:00:00Z"
     elif type_ == "boolean":
         return value.lower() == "true"
     else:
@@ -120,7 +157,7 @@ def format_values(entity, row):
         if key not in entity_schema:
             continue
 
-        type_ = entity_schema[key]
+        type_ = entity_schema[key]["type"]
         rtn[key] = format_value(value, type_)
 
     return rtn
@@ -146,7 +183,7 @@ TYPE_MAP = {
     "boolean": "boolean",
     "integer": "integer",
     "decimal": "float",
-    "date": "datetime",
+    "date": "date",
     "datetime": "datetime",
 }
 
@@ -155,7 +192,8 @@ def get_field_schema(field_element):
     # print_element(field_element)
     name = field_element.find('name').text.lower()
     type_ = TYPE_MAP.get(field_element.find('type').text, None)
-    return name, type_
+    required = name == "id" or field_element.find('required').text.lower() == "true"
+    return name, type_, required
 
 
 def get_schema(entity):
@@ -166,12 +204,12 @@ def get_schema(entity):
 
     field_dict = {}
     for field in fields:
-        name, type_ = get_field_schema(field)
+        name, type_, required = get_field_schema(field)
         if type_ is None:
             # TODO: log something
             pass
         else:
-            field_dict[name] = type_
+            field_dict[name] = {"type": type_, "required": required}
 
     return field_dict
 
@@ -187,8 +225,45 @@ def get_schemas():
     return schemas
 
 
+def get_json_schema(schema):
+    print(schema)
+    rtn = {}
+
+    if schema["type"] in ["date", "datetime"]:
+        type_ = "string"
+        rtn["format"] = "date-time"
+    else:
+        type_ = schema["type"]
+
+    if not schema["required"]:
+        type_ = [type_, "null"]
+
+    rtn["type"] = type_
+    return rtn
+
+
+def schema_to_json_schema(schema):
+    properties = {k: get_json_schema(v) for k, v in schema.items()}
+    return {
+        "type": "object",
+        "properties": properties,
+    }
+
+
+def sync_entity(entity):
+    # TODO- Need to time-gate
+
+    singer.write_schema(entity, schema_to_json_schema(SCHEMAS[entity]["fields"]), ["id"])
+    for record in gen_records(entity):
+        singer.write_record(entity, record)
+
+    # TODO- Update state
+
+
 def do_sync():
     SCHEMAS.update(get_schemas())
+    for entity in SCHEMAS.keys():
+        sync_entity(entity)
 
 
 def main():
