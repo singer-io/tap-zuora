@@ -3,6 +3,8 @@
 import csv
 import datetime
 import io
+import json
+import sys
 import time
 from xml.etree import ElementTree
 
@@ -19,6 +21,10 @@ SCHEMAS = {}
 
 LOGGER = singer.get_logger()
 SESSION = requests.Session()
+
+
+class NoSuchDataSourceException(Exception):
+    pass
 
 
 def print_element(element):
@@ -47,9 +53,9 @@ def post(url, **kwargs):
 
 
 def update_field_for_entity(entity):
-    if "updateddate" in SCHEMAS[entity]["fields"]:
+    if "updateddate" in SCHEMAS[entity]:
         return "UpdatedDate"
-    elif "transactiondate" in SCHEMAS[entity]["fields"]:
+    elif "transactiondate" in SCHEMAS[entity]:
         return "TransactionDate"
     else:
         return None
@@ -61,30 +67,39 @@ def start_date_for_entity(entity):
     else:
         return CONFIG["start_date"]
 
-def get_where_clause(entity):
+
+def end_datetime_from_start_datetime(start_datetime):
+    end_datetime = start_datetime + datetime.timedelta(days=1)
+    if end_datetime >= CONFIG['now_datetime']:
+        end_datetime = CONFIG['now_datetime']
+
+    return end_datetime
+
+
+def get_where_clause(entity, start_datetime, end_datetime):
     update_field = update_field_for_entity(entity)
     if update_field is not None:
-        start_date = start_date_for_entity(entity)
-        end_date = utils.strftime(utils.strptime(start_date) + datetime.timedelta(days=1))
-        return ' where {update_field} >= "{start_date}" and {update_field} < "{end_date}"'.format(
+        end_date_str = utils.strftime(end_datetime)
+        start_date_str = utils.strftime(start_datetime)
+        return " where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
             update_field=update_field,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=start_date_str,
+            end_date=end_date_str,
         )
     else:
         return ""
 
-def get_export(entity, fields=None):
+
+def get_export(entity, start_datetime, end_datetime, fields=None):
     if fields:
         field_list = ", ".join(fields)
     else:
         field_list = "*"
 
-    # need the where clause here
     zoql = "select {field_list} from {entity}{where}".format(
         field_list=field_list,
         entity=entity,
-        where=get_where_clause(entity),
+        where=get_where_clause(entity, start_datetime, end_datetime),
     )
 
     data = {
@@ -92,13 +107,17 @@ def get_export(entity, fields=None):
         "Query": zoql,
     }
 
-    LOGGER.info("Query: {}".format(zoql))
+    #print("Query: {}".format(zoql))
     resp = post("{}/object/export".format(BASE_URL), json=data)
 
     if resp.status_code != 200:
-        print(resp.status_code)
-        print(resp.content)
-        raise Exception("API got mad")
+        data = resp.json()
+        if 'Errors' in data:
+            err = data['Errors'][0].get('Message', '')
+            if "noSuchDataSource" in err:
+                raise NoSuchDataSourceException(entity)
+            else:
+                raise Exception("API got mad. status={} body={}".format(resp.status_code, resp.content))
 
     export_id = resp.json()["Id"]
 
@@ -150,8 +169,7 @@ def format_value(value, type_):
 
 
 def format_values(entity, row):
-    entity_schema = SCHEMAS[entity]['fields']
-
+    entity_schema = SCHEMAS[entity]
     rtn = {}
     for key, value in row.items():
         if key not in entity_schema:
@@ -163,17 +181,39 @@ def format_values(entity, row):
     return rtn
 
 
-def gen_records(entity, fields=None):
-    reader = get_export(entity, fields)
+def _gen_records(entity, start_datetime, end_datetime, fields=None):
+    reader = get_export(entity, start_datetime, end_datetime, fields)
     for row in reader:
         row = convert_keys(row)
         row = format_values(entity, row)
         yield row
 
+    if end_datetime:
+        STATE[entity] = utils.strftime(end_datetime)
+        #singer.write_state(STATE)
+
+
+def gen_records(entity, fields=None):
+    update_field = update_field_for_entity(entity)
+    if update_field is not None:
+        start_datetime = utils.strptime(start_date_for_entity(entity))
+        while start_datetime < CONFIG['now_datetime']:
+            end_datetime = end_datetime_from_start_datetime(start_datetime)
+            for row in _gen_records(entity, start_datetime, end_datetime, fields):
+                yield row
+
+            start_datetime = end_datetime
+
+    else:
+        for row in _gen_records(entity, None, None, fields):
+            yield row
+
+
 
 def get_entities():
     xml_str = get("{}/describe".format(BASE_URL)).content
     et = ElementTree.fromstring(xml_str)
+    #print_element(et)
     return [t.text for t in et.findall('./object/name')]
 
 
@@ -196,10 +236,14 @@ def get_field_schema(field_element):
     return name, type_, required
 
 
-def get_schema(entity):
-    # print(entity)
+def _get_schema(entity):
     xml_str = get("{}/describe/{}".format(BASE_URL, entity)).content
     et = ElementTree.fromstring(xml_str)
+    return et
+
+
+def get_schema(entity):
+    et = _get_schema(entity)
     fields = et.find('fields').getchildren()
 
     field_dict = {}
@@ -214,31 +258,62 @@ def get_schema(entity):
     return field_dict
 
 
-def get_schemas():
+def discover_field_schema(field_element):
+    name = field_element.find('name').text.lower()
+    type_ = TYPE_MAP.get(field_element.find('type').text, None)
+    required = name == "id" or field_element.find('required').text.lower() == "true"
+
+    if name in ["id", "updateddate", "transactiondate"]:
+        inclusion = "automatic"
+    else:
+        inclusion = "available"
+
+    return name, get_json_schema(type_, required, inclusion)
+
+
+def discover_schema(entity):
+    et = _get_schema(entity)
+    fields = et.find('fields').getchildren()
+
+    properties = {}
+    for field_entity in fields:
+        name, schema = discover_field_schema(field_entity)
+        properties[name] = schema
+
+    schema = {
+        "type": "object",
+        "properties": properties,
+    }
+
+    return schema
+
+
+def discover_schemas():
     entities = get_entities()
     schemas = {}
     for entity in entities:
-        schemas[entity] = {
-            "fields": get_schema(entity),
-        }
+        schemas[entity] = discover_schema(entity)
 
     return schemas
 
 
-def get_json_schema(schema):
-    print(schema)
-    rtn = {}
+def get_json_schema(type_, required, inclusion):
+    #print(schema)
+    rtn = {
+        "inclusion": inclusion,
+    }
 
-    if schema["type"] in ["date", "datetime"]:
-        type_ = "string"
+    if type_ in ["date", "datetime"]:
+        t = "string"
         rtn["format"] = "date-time"
+
     else:
-        type_ = schema["type"]
+        t = type_
 
-    if not schema["required"]:
-        type_ = [type_, "null"]
+    if not required:
+        t = [t, "null"]
 
-    rtn["type"] = type_
+    rtn["type"] = t
     return rtn
 
 
@@ -251,18 +326,30 @@ def schema_to_json_schema(schema):
 
 
 def sync_entity(entity):
-    # TODO- Need to time-gate
+    print("Syncing entity: {}".format(entity))
+    SCHEMAS[entity] = get_schema(entity)
+    singer.write_schema(entity, schema_to_json_schema(SCHEMAS[entity]), ["id"])
+    try:
+        for record in gen_records(entity):
+            #singer.write_record(entity, record)
+            pass
+    except NoSuchDataSourceException:
+        pass
 
-    singer.write_schema(entity, schema_to_json_schema(SCHEMAS[entity]["fields"]), ["id"])
-    for record in gen_records(entity):
-        singer.write_record(entity, record)
 
-    # TODO- Update state
+def cache_now():
+    CONFIG['now_datetime'] = datetime.datetime.utcnow()
+
+
+def do_discover():
+    schemas = get_schemas()
+    json.dump({"streams": schemas}, sys.stdout, indent=4)
 
 
 def do_sync():
-    SCHEMAS.update(get_schemas())
-    for entity in SCHEMAS.keys():
+    cache_now()
+
+    for entity in get_entities():
         sync_entity(entity)
 
 
