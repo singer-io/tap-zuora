@@ -30,6 +30,79 @@ MAX_EXPORT_POLLS = 10       # number of times to poll job for completion before 
 EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks
 EXPORT_DAY_RANGE = 30       # number of days to export at once
 
+# These entities are only available if the Advanced AR Settlement feature is
+# enabled in Zuora.
+ADVANCED_AR_ENTITIES = [
+    "ApplicationGroup",
+    "CreditMemo",
+    "CreditMemoApplication",
+    "CreditMemoApplicationItem",
+    "CreditMemoItem",
+    "CreditMemoPart",
+    "CreditMemoPartItem",
+    "CreditTaxationItem",
+    "DebitMemo",
+    "DebitMemoItem",
+    "DebitTaxationItem",
+    "PaymentApplication",
+    "PaymentPart",
+    "RefundApplication",
+    "RefundPart",
+    "RevenueEventItemCreditMemoItem",
+    "RevenueEventItemDebitMemoItem",
+    "RevenueScheduleItemCreditMemoItem",
+    "RevenueScheduleItemDebitMemoItem",
+]
+
+# If the Advanced AR Settlement feature in Zuora is enabled, these tables are
+# deprecated.
+ADVANCED_AR_ENTITIES_DEPRECATED = [
+    "CreditBalanceAdjustment",
+    "InvoiceAdjustment",
+    "InvoiceItemAdjustment",
+    "InvoicePayment",
+    "RefundInvoicePayment",
+]
+
+CREDIT_BALANCE_ENTITIES = [
+    "CreditBalanceAdjustment",
+]
+
+CUSTOM_EXCHANGE_RATES_ENTITIES = [
+    "CustomExchangeRate",
+]
+
+INVOICE_ITEM_ENTITIES = [
+    "PaymentApplicationItem",
+    "PaymentPartItem",
+    "RefundApplicationItem",
+    "RefundPartItem",
+]
+
+ZUORA_REVENUE_ENTITIES = [
+    "RevenueChargeSummaryItem",
+    "RevenueEventItem",
+    "RevenueEventItemCreditMemoItem",
+    "RevenueEventItemDebitMemoItem",
+    "RevenueEventItemInvoiceItem",
+    "RevenueEventItemInvoiceItemAdjustment",
+    "RevenueScheduleItem",
+    "RevenueScheduleItemCreditMemoItem",
+    "RevenueScheduleItemDebitMemoItem",
+    "RevenueScheduleItemInvoiceItem",
+    "RevenueScheduleItemInvoiceItemAdjustment",
+]
+
+TYPE_MAP = {
+    "picklist": "string",
+    "text": "string",
+    "boolean": "boolean",
+    "integer": "integer",
+    "decimal": "float",
+    "date": "date",
+    "datetime": "datetime",
+}
+
 
 class NoSuchDataSourceException(Exception):
     pass
@@ -47,18 +120,44 @@ def print_element(element):
     print(ElementTree.tostring(element).decode('utf-8'))
 
 
+def entity_enabled(entity):
+    if entity in ADVANCED_AR_ENTITIES and not CONFIG.get("advanced_ar_enabled", False):
+        return False
+
+    if entity in ADVANCED_AR_ENTITIES_DEPRECATED and CONFIG.get("advanced_ar_enabled", False):
+        return False
+
+    if entity in CREDIT_BALANCE_ENTITIES and not CONFIG.get("credit_balance_enabled", False):
+        return False
+
+    if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not CONFIG.get("custom_exchange_rates_enabled", False):
+        return False
+
+    if entity in INVOICE_ITEM_ENTITIES and not CONFIG.get("invoice_item_enabled", False):
+        return False
+
+    if entity in ZUORA_REVENUE_ENTITIES and not CONFIG.get("zuora_revenue_enabled", False):
+        return False
+
+    return True
+
+
 def request(method, url, **kwargs):
     stream = kwargs.pop('stream', False)
-    headers = kwargs.pop('headers', {})
-    headers['apiAccessKeyId'] = CONFIG['api_key']
-    headers['apiSecretAccessKey'] = CONFIG['api_secret']
-    headers['Content-Type'] = 'application/json'
+    headers = {
+        'apiAccessKeyId': CONFIG['api_key'],
+        'apiSecretAccessKey': CONFIG['api_secret'],
+        'x-zuora-wsdl-version': "83.0",
+        'Content-Type': 'application/json',
+    }
 
     req = requests.Request(method, url, headers=headers, **kwargs).prepare()
-    LOGGER.info("{}: {}".format(method, req.url))
-    resp = SESSION.send(req, stream=stream)
+    if "json" in kwargs:
+        LOGGER.info("{}: {} - {}".format(method, req.url, kwargs["json"]))
+    else:
+        LOGGER.info("{}: {}".format(method, req.url))
 
-    return resp
+    return SESSION.send(req, stream=stream)
 
 
 def get(url, **kwargs):
@@ -109,11 +208,11 @@ def get_where_clause(entity, start_datetime, end_datetime):
 
 def get_export(entity, start_datetime, end_datetime, fields=None, retry=0):
     # TODO - if zuora ever fixes their API, we can query subfields until then just get them all
-    # if fields:
-    #     field_list = ", ".join(fields)
-    # else:
-    #     field_list = "*"
-    field_list = "*"
+    if fields:
+        field_list = ", ".join(fields)
+    else:
+        field_list = "*"
+    # field_list = "*"
 
     zoql = "select {field_list} from {entity}{where}".format(
         field_list=field_list,
@@ -176,11 +275,7 @@ def get_export(entity, start_datetime, end_datetime, fields=None, retry=0):
         else:
             return get_export(entity, start_datetime, end_datetime, fields, retry + 1)
 
-    r = get("{}/files/{}".format(BASE_URL, file_id), stream=True)
-    if r.encoding is None:
-        r.encoding = 'utf-8'
-
-    return r
+    return get("{}/files/{}".format(BASE_URL, file_id), stream=True)
 
 
 def format_value(value, type_):
@@ -229,13 +324,6 @@ def parse_header_line(line):
     return [convert_header(h) for h in headers]
 
 
-def filter_fields(row, fields):
-    if fields:
-        return {k: v for k, v in row.items() if k in fields}
-    else:
-        return row
-
-
 def _gen_records(entity, start_datetime, end_datetime, fields=None):
     with singer.stats.Timer(source=entity) as stats:
         # These are None by default, so they need to be initialized to 0
@@ -257,7 +345,6 @@ def _gen_records(entity, start_datetime, end_datetime, fields=None):
             reader = csv.reader(io.StringIO(line.decode('utf-8')))
             row = dict(zip(headers, next(reader)))
             row = format_values(entity, row)
-            row = filter_fields(row, fields)
             yield row
 
         # If there's an end datetime we store that in the state and stream the state
@@ -286,18 +373,7 @@ def gen_records(entity, fields=None):
 def get_entities():
     xml_str = get("{}/describe".format(BASE_URL)).content
     et = ElementTree.fromstring(xml_str)
-    return [t.text for t in et.findall('./object/name')]
-
-
-TYPE_MAP = {
-    "picklist": "string",
-    "text": "string",
-    "boolean": "boolean",
-    "integer": "integer",
-    "decimal": "float",
-    "date": "date",
-    "datetime": "datetime",
-}
+    return [t.text for t in et.findall('./object/name') if entity_enabled(t.text)]
 
 
 def get_field_schema(field_element):
@@ -310,8 +386,7 @@ def get_field_schema(field_element):
 
 def _get_schema(entity):
     xml_str = get("{}/describe/{}".format(BASE_URL, entity)).content
-    et = ElementTree.fromstring(xml_str)
-    return et
+    return ElementTree.fromstring(xml_str)
 
 
 def get_schema(entity):
