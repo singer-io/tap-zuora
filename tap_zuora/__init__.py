@@ -29,11 +29,18 @@ EXPORT_DAY_RANGE = 30       # number of days to export at once
 
 LOGGER = singer.get_logger()
 
+# These entities aren't documented on
+# https://knowledgecenter.zuora.com/CD_Reporting/D_Data_Sources_and_Exports/AB_Data_Source_Availability
+# but the discover endpoint returns them as available. Don't ever try to get
+# these.
+NEVER_AVAILABLE_ENTITIES = [
+    "ContactSnapshot",
+]
+
 # These entities are only available if the Advanced AR Settlement feature is
 # enabled in Zuora.
 ADVANCED_AR_ENTITIES = [
     "ApplicationGroup",
-    "ContactSnapshot",
     "CreditMemo",
     "CreditMemoApplication",
     "CreditMemoApplicationItem",
@@ -309,16 +316,16 @@ class ZuoraEntity:
         # If the export timed out, we want to retry until we hit max retries
         if not file_id:
             if retry < MAX_EXPORT_TRIES:
+                LOGGER.error("Export timed out. Retrying")
                 return self.get_export(start, end, retry + 1)
             else:
+                LOGGER.error("Export timed out {} times. Aborting".format(MAX_EXPORT_TRIES))
                 raise ExportTimedOutException()
 
         # If the export failed, we want to retry until we hit max retries
         if failed:
-            if retry < MAX_EXPORT_TRIES:
-                return self.get_export(start, end, retry + 1)
-            else:
-                raise ExportFailedException()
+            LOGGER.error("Export failed".format(MAX_EXPORT_TRIES))
+            raise ExportFailedException()
 
         # It's completed! Stream down the CSV
         return self.client.get("/files/{}".format(file_id), stream=True)
@@ -393,14 +400,14 @@ class ZuoraClient:
         self.features = features
         self.session = requests.Session()
         self.state = state
-        self.annotated_schemas = annotated_schemas["streams"]
+        self.annotated_schemas = annotated_schemas
 
         self.now_datetime = datetime.datetime.utcnow()
         self.now_str = singer.utils.strftime(self.now_datetime)
 
     @classmethod
     def from_args(cls, args):
-        return cls(args.state, args.schema, **args.config)
+        return cls(args.state, args.properties, **args.config)
 
     @property
     def base_url(self):
@@ -433,10 +440,7 @@ class ZuoraClient:
         return self.request('POST', url, **kwargs)
 
     def entity_available(self, entity):
-        if entity not in self.annotated_schemas:
-            return False
-
-        if not self.annotated_schemas[entity].get("selected", False):
+        if entity in NEVER_AVAILABLE_ENTITIES:
             return False
 
         if entity in ADVANCED_AR_ENTITIES and not self.features.get("advanced_ar", False):
@@ -462,10 +466,26 @@ class ZuoraClient:
     def get_available_entities(self):
         xml_str = self.get("/describe").content
         et = ElementTree.fromstring(xml_str)
-        entity_names = [t.text for t in et.findall('./object/name') if self.entity_available(t.text)]
-        return [ZuoraEntity(self, name, self.annotated_schemas[name]) for name in entity_names]
+        entity_names = (t.text for t in et.findall('./object/name') if self.entity_available(t.text))
 
-    def get_end_date(start):
+        entities = []
+        for entity_name in entity_names:
+            if self.annotated_schemas and "streams" in self.annotated_schemas:
+                if entity_name not in self.annotated_schemas["streams"]:
+                    continue
+
+                if not self.annotated_schemas["streams"][entity_name].get("selected", False):
+                    continue
+
+                annotated_schema = self.annotated_schemas["streams"]
+            else:
+                annotated_schema = None
+
+            entities.append(ZuoraEntity(self, entity_name, annotated_schema))
+
+        return entities
+
+    def get_end_date(self, start):
         if isinstance(start, str):
             start = singer.utils.strptime(start)
 
@@ -483,7 +503,7 @@ class ZuoraClient:
     def do_discover(self):
         LOGGER.info("RUNNING IN DISCOVER MODE")
         streams = {}
-        for entity in client.get_available_entities():
+        for entity in self.get_available_entities():
             streams[entity.name] = entity.schema
             streams[entity.name]["selected"] = True
 
@@ -491,14 +511,14 @@ class ZuoraClient:
 
     def do_sync(self):
         LOGGER.info("RUNNING IN SYNC MODE")
-        for entity in client.get_available_entities():
+        for entity in self.get_available_entities():
             entity.sync()
 
 
 
 def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
-    client = ZuoraClient(args.state, args.properties, **args.config)
+    client = ZuoraClient.from_args(args)
 
     if args.discover:
         client.do_discover()
