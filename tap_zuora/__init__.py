@@ -19,7 +19,7 @@ import singer.utils
 BASE_URL = "https://rest.zuora.com/v1"
 BASE_SANDBOX_URL = "https://rest.apisandbox.zuora.com/v1"
 LATEST_WSDL_VERSION = "84.0"
-REQUIRED_CONFIG_KEYS = ['start_date', 'api_key', 'api_secret']
+REQUIRED_CONFIG_KEYS = ["start_date", "api_key", "api_secret"]
 REQUIRED_FIELDS = ["Id", "UpdatedDate", "TransactionDate"]
 
 MAX_EXPORT_TRIES = 3        # number of times to rety failed export before ExportFailedException
@@ -398,6 +398,10 @@ class ZuoraClient:
         self.now_datetime = datetime.datetime.utcnow()
         self.now_str = singer.utils.strftime(self.now_datetime)
 
+    @classmethod
+    def from_args(cls, args):
+        return cls(args.state, args.schema, **args.config)
+
     @property
     def base_url(self):
         if self.sandbox:
@@ -471,29 +475,25 @@ class ZuoraClient:
         else:
             return singer.utils.strftime(end_datetime)
 
-
-def do_check(client):
-    LOGGER.info("RUNNING IN CHECK MODE")
-    entity = ZuoraEntity(client, "Subscription")
-    entity.sync()
-
-
-def do_discover(client):
-    LOGGER.info("RUNNING IN DISCOVER MODE")
-
-    streams = {}
-    for entity in client.get_available_entities():
-        streams[entity.name] = entity.schema
-        streams[entity.name]["selected"] = True
-
-    json.dump({"streams": streams}, sys.stdout, indent=4)
-
-
-def do_sync(client):
-    LOGGER.info("RUNNING IN SYNC MODE")
-
-    for entity in client.get_available_entities():
+    def do_check(self):
+        LOGGER.info("RUNNING IN CHECK MODE")
+        entity = ZuoraEntity(self, "Subscription")
         entity.sync()
+
+    def do_discover(self):
+        LOGGER.info("RUNNING IN DISCOVER MODE")
+        streams = {}
+        for entity in client.get_available_entities():
+            streams[entity.name] = entity.schema
+            streams[entity.name]["selected"] = True
+
+        json.dump({"streams": streams}, sys.stdout, indent=4)
+
+    def do_sync(self):
+        LOGGER.info("RUNNING IN SYNC MODE")
+        for entity in client.get_available_entities():
+            entity.sync()
+
 
 
 def main():
@@ -501,11 +501,11 @@ def main():
     client = ZuoraClient(args.state, args.properties, **args.config)
 
     if args.discover:
-        do_discover(client)
+        client.do_discover()
     elif args.properties:
-        do_sync(client)
+        client.do_sync()
     else:
-        do_check(client)
+        client.do_check()
 
 
 if __name__ == "__main__":
