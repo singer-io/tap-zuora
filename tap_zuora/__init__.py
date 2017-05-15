@@ -240,11 +240,12 @@ class ZuoraEntity:
             return None
 
     @property
-    def field_list(self):
+    def field_query(self):
         if not self.annotated_schema:
-            return list(self.definition.keys())
+            return "*"
         else:
-            return [k for k, v in self.annotated_schema["properties"].items() if v.get("selected", False)]
+            fields = [k for k, v in self.annotated_schema["properties"].items() if v.get("selected", False)]
+            return ", ".join(fields)
 
     @property
     def start_date(self):
@@ -261,9 +262,7 @@ class ZuoraEntity:
             self.client.state[self.name] = when
 
     def _where_clause(self, start_date=None, end_date=None):
-        if self.update_field:
-            assert start_date, "Missing start_date"
-            assert end_date, "Missing end_date"
+        if self.update_field and start_date and end_date:
             return "where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
                 update_field=self.update_field,
                 start_date=start_date,
@@ -274,7 +273,7 @@ class ZuoraEntity:
 
     def _query_data(self, start_date=None, end_date=None):
         zoql = "select {fields} from {entity} {where}".format(
-            fields=", ".join(self.field_list),
+            fields=self.field_query,
             entity=self.name,
             where=self._where_clause(start_date, end_date),
         )
