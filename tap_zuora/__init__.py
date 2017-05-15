@@ -271,16 +271,17 @@ class ZuoraEntity:
         else:
             return ""
 
-    def _query_data(self, start_date=None, end_date=None):
-        zoql = "select {fields} from {entity} {where}".format(
+    def _zoql(self, start_date=None, end_date=None):
+        return "select {fields} from {entity} {where}".format(
             fields=self.field_query,
             entity=self.name,
             where=self._where_clause(start_date, end_date),
         )
 
+    def _query_data(self, start_date=None, end_date=None):
         return {
             "Format": "csv",
-            "Query": zoql,
+            "Query": self._zoql(start_date, end_date),
         }
 
     def get_export(self, start_date=None, end_date=None, retry=0):
