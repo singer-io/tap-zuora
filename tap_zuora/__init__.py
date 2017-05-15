@@ -4,36 +4,36 @@ import csv
 import datetime
 import io
 import json
+import requests
 import sys
 import time
 from xml.etree import ElementTree
 
-import requests
+import pendulum
+
 import singer
 import singer.stats
+import singer.utils
 
-from singer import utils
 
-
-BASE_URL = "https://rest.apisandbox.zuora.com/v1"
+BASE_URL = "https://rest.zuora.com/v1"
+BASE_SANDBOX_URL = "https://rest.apisandbox.zuora.com/v1"
+LATEST_WSDL_VERSION = "84.0"
 REQUIRED_CONFIG_KEYS = ['start_date', 'api_key', 'api_secret']
-CONFIG = {}
-STATE = {}
-SCHEMAS = {}
-PROPERTIES = {}
-
-LOGGER = singer.get_logger()
-SESSION = requests.Session()
+REQUIRED_FIELDS = ["Id", "UpdatedDate", "TransactionDate"]
 
 MAX_EXPORT_TRIES = 3        # number of times to rety failed export before ExportFailedException
 MAX_EXPORT_POLLS = 10       # number of times to poll job for completion before ExportTimedOutException
 EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks
 EXPORT_DAY_RANGE = 30       # number of days to export at once
 
+LOGGER = singer.get_logger()
+
 # These entities are only available if the Advanced AR Settlement feature is
 # enabled in Zuora.
 ADVANCED_AR_ENTITIES = [
     "ApplicationGroup",
+    "ContactSnapshot",
     "CreditMemo",
     "CreditMemoApplication",
     "CreditMemoApplicationItem",
@@ -104,10 +104,6 @@ TYPE_MAP = {
 }
 
 
-class NoSuchDataSourceException(Exception):
-    pass
-
-
 class ExportTimedOutException(Exception):
     pass
 
@@ -116,429 +112,401 @@ class ExportFailedException(Exception):
     pass
 
 
-def print_element(element):
-    print(ElementTree.tostring(element).decode('utf-8'))
+def parse_field_element(field_element):
+    name = field_element.find('name').text
+    type = TYPE_MAP.get(field_element.find('type').text, None)
+    required = name in REQUIRED_FIELDS or field_element.find('required').text.lower() == "true"
+    contexts = [t.text for t in field_element.find('contexts').getchildren()]
+    return name, type, required, contexts
 
 
-def entity_enabled(entity):
-    if entity in ADVANCED_AR_ENTITIES and not CONFIG.get("advanced_ar_enabled", False):
-        return False
-
-    if entity in ADVANCED_AR_ENTITIES_DEPRECATED and CONFIG.get("advanced_ar_enabled", False):
-        return False
-
-    if entity in CREDIT_BALANCE_ENTITIES and not CONFIG.get("credit_balance_enabled", False):
-        return False
-
-    if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not CONFIG.get("custom_exchange_rates_enabled", False):
-        return False
-
-    if entity in INVOICE_ITEM_ENTITIES and not CONFIG.get("invoice_item_enabled", False):
-        return False
-
-    if entity in ZUORA_REVENUE_ENTITIES and not CONFIG.get("zuora_revenue_enabled", False):
-        return False
-
-    return True
+def format_zuora_datetime(datetime):
+    datetime = pendulum.parse(datetime)
+    datetime = datetime.in_timezone('utc')
+    return singer.utils.strftime(datetime._datetime)
 
 
-def request(method, url, **kwargs):
-    stream = kwargs.pop('stream', False)
-    headers = {
-        'apiAccessKeyId': CONFIG['api_key'],
-        'apiSecretAccessKey': CONFIG['api_secret'],
-        'x-zuora-wsdl-version': "83.0",
-        'Content-Type': 'application/json',
-    }
-
-    req = requests.Request(method, url, headers=headers, **kwargs).prepare()
-    if "json" in kwargs:
-        LOGGER.info("{}: {} - {}".format(method, req.url, kwargs["json"]))
-    else:
-        LOGGER.info("{}: {}".format(method, req.url))
-
-    return SESSION.send(req, stream=stream)
-
-
-def get(url, **kwargs):
-    return request('GET', url, **kwargs)
-
-
-def post(url, **kwargs):
-    return request('POST', url, **kwargs)
-
-
-def update_field_for_entity(entity):
-    if "UpdatedDate" in SCHEMAS[entity]:
-        return "UpdatedDate"
-    elif "TransactionDate" in SCHEMAS[entity]:
-        return "TransactionDate"
-    else:
-        return None
-
-
-def start_date_for_entity(entity):
-    if entity in STATE:
-        return STATE[entity]
-    else:
-        return CONFIG["start_date"]
-
-
-def end_datetime_from_start_datetime(start_datetime):
-    end_datetime = start_datetime + datetime.timedelta(days=EXPORT_DAY_RANGE)
-    if end_datetime >= CONFIG['now_datetime']:
-        end_datetime = CONFIG['now_datetime']
-
-    return end_datetime
-
-
-def get_where_clause(entity, start_datetime, end_datetime):
-    update_field = update_field_for_entity(entity)
-    if update_field is not None:
-        end_date_str = utils.strftime(end_datetime)
-        start_date_str = utils.strftime(start_datetime)
-        return " where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
-            update_field=update_field,
-            start_date=start_date_str,
-            end_date=end_date_str,
-        )
-    else:
-        return ""
-
-
-def get_export(entity, start_datetime, end_datetime, fields=None, retry=0):
-    # TODO - if zuora ever fixes their API, we can query subfields until then just get them all
-    if fields:
-        field_list = ", ".join(fields)
-    else:
-        field_list = "*"
-    # field_list = "*"
-
-    zoql = "select {field_list} from {entity}{where}".format(
-        field_list=field_list,
-        entity=entity,
-        where=get_where_clause(entity, start_datetime, end_datetime),
-    )
-
-    data = {
-        "Format": "csv",
-        "Query": zoql,
-    }
-
-    with singer.stats.Timer(source="export_create") as stats:
-        LOGGER.info("QUERY: {}".format(zoql))
-        resp = post("{}/object/export".format(BASE_URL), json=data)
-
-        if resp.status_code != 200:
-            try:
-                data = resp.json()
-            except:
-                raise Exception("API returned an error. status={} body={}"
-                                .format(resp.status_code, resp.content))
-
-            if 'Errors' in data:
-                err = data['Errors'][0].get('Message', '')
-                if "noSuchDataSource" in err:
-                    raise NoSuchDataSourceException(entity)
-                else:
-                    raise Exception("API returned an error. status={} body={}"
-                                    .format(resp.status_code, resp.content))
-
-    export_id = resp.json()["Id"]
-
-    # Wait a second for export to be ready
-    time.sleep(1)
-
-    # Try to download export until we exhaust retries
-    for i in range(MAX_EXPORT_POLLS):
-        with singer.stats.Timer(source="export_poll") as stats:
-            resp = get("{}/object/export/{}".format(BASE_URL, export_id))
-            d = resp.json()
-            if d['Status'] == "Completed":
-                file_id = d['FileId']
-                break
-            elif d['Status'] == "Failed":
-                retry += 1
-                if retry == MAX_EXPORT_TRIES:
-                    raise ExportFailedException()
-                else:
-                    return get_export(entity, start_datetime, end_datetime, fields, retry + 1)
-            else:
-                LOGGER.info("Export not complete, sleeping %s seconds", EXPORT_SLEEP_INTERVAL)
-
-        time.sleep(EXPORT_SLEEP_INTERVAL)
-
-    else: # if for loop is exhausted without a success
-        retry += 1
-        if retry == MAX_EXPORT_TRIES:
-            raise ExportTimedOutException()
-        else:
-            return get_export(entity, start_datetime, end_datetime, fields, retry + 1)
-
-    return get("{}/files/{}".format(BASE_URL, file_id), stream=True)
-
-
-def format_value(value, type_):
+def format_value(value, type):
     if value == "":
         return None
 
-    if type_ == "integer":
+    if type == "integer":
         return int(value)
-    elif type_ == "float":
+    elif type == "float":
         return float(value)
-    elif type_ == "datetime":
-        if "+" in value:
-            value, _ = value.split("+")
-            return value
-        else:
-            return value
-    elif type_ == "date":
-        return value + "T00:00:00Z"
-    elif type_ == "boolean":
+    elif type in ["date", "datetime"]:
+        return format_zuora_datetime(value)
+    elif type == "boolean":
         return value.lower() == "true"
     else:
         return value
 
 
-def format_values(entity, row):
-    entity_schema = SCHEMAS[entity]
-    rtn = {}
-    for key, value in row.items():
-        if key not in entity_schema:
-            continue
-
-        type_ = entity_schema[key]["type"]
-        rtn[key] = format_value(value, type_)
-
-    return rtn
+def convert_header(header):
+    _, header = header.split(".", 1)
+    return header
 
 
-def convert_header(key):
-    _, key = key.split(".", 1)
-    return key
+def parse_line(line):
+    reader = csv.reader(io.StringIO(line.decode('utf-8')))
+    return next(reader)
 
 
 def parse_header_line(line):
-    reader = csv.reader(io.StringIO(line.decode('utf-8')))
-    headers = next(reader)
-    return [convert_header(h) for h in headers]
+    return [convert_header(h) for h in parse_line(line)]
 
 
-def _gen_records(entity, start_datetime, end_datetime, fields=None):
-    with singer.stats.Timer(source=entity) as stats:
-        # These are None by default, so they need to be initialized to 0
-        stats.record_count = 0
-        stats.byte_count = 0
+class ZuoraEntity:
+    def __init__(self, client, name, annotated_schema=None):
+        self.client = client
+        self.name = name
+        self.annotated_schema = None
+        self._schema = None
+        self._definition = None
 
-        # This returns a streaming response, so we need to use iter_lines()
-        lines = get_export(entity, start_datetime, end_datetime, fields).iter_lines()
+    def _get_definition(self):
+        """This will define the entity."""
+        xml_str = self.client.get("/describe/{}".format(self.name)).content
+        et = ElementTree.fromstring(xml_str)
 
-        # Parse the headers and track the number of bytes sent
-        header_line = next(lines)
-        stats.byte_count += len(header_line) + 2 # count newlines
-        headers = parse_header_line(header_line)
+        field_dict = {}
+        for field_element in et.find('fields').getchildren():
+            name, type, required, contexts = parse_field_element(field_element)
+            if type is None:
+                LOGGER.debug("{}.{} has an unsupported data type".format(self.name, name))
+            elif "export" not in contexts:
+                LOGGER.debug("{}.{} not available".format(self.name, name))
+            else:
+                field_dict[name] = {"type": type, "required": required}
 
-        # Iterate through the lines and yield them
-        for line in lines:
-            stats.record_count += 1
-            stats.byte_count += len(line) + 2 # count newlines
-            reader = csv.reader(io.StringIO(line.decode('utf-8')))
-            row = dict(zip(headers, next(reader)))
-            row = format_values(entity, row)
-            yield row
+        return field_dict
 
-        # If there's an end datetime we store that in the state and stream the state
-        if end_datetime:
-            STATE[entity] = utils.strftime(end_datetime)
-            singer.write_state(STATE)
+    @property
+    def definition(self):
+        if not self._definition:
+            self._definition = self._get_definition()
 
+        return self._definition
 
-def gen_records(entity, fields=None):
-    update_field = update_field_for_entity(entity)
+    def _get_schema(self):
+        """This will generate the schema for discovery mode."""
+        properties = {}
+        for field_name, field_dict in self.definition.items():
+            d = {}
+            d["selected"] = True
 
-    if update_field is not None:
-        start_datetime = utils.strptime(start_date_for_entity(entity))
-        while start_datetime < CONFIG['now_datetime']:
-            end_datetime = end_datetime_from_start_datetime(start_datetime)
-            for row in _gen_records(entity, start_datetime, end_datetime, fields):
+            if field_dict["type"] in ["date", "datetime"]:
+                d["type"] = "string"
+                d["format"] = "date-time"
+            else:
+                d["type"] = field_dict["type"]
+
+            if not field_dict["required"]:
+                d["type"] = [d["type"], "null"]
+
+            if field_name in REQUIRED_FIELDS:
+                d['inclusion'] = "automatic"
+            else:
+                d['inclusion'] = "available"
+
+            properties[field_name] = d
+
+        return {
+            "type": "object",
+            "properties": properties,
+        }
+
+    @property
+    def schema(self):
+        if not self._schema:
+            self._schema = self._get_schema()
+
+        return self._schema
+
+    @property
+    def update_field(self):
+        if "UpdatedDate" in self.definition:
+            return "UpdatedDate"
+        elif "TransactionDate" in self.definition:
+            return "TransactionDate"
+        else:
+            return None
+
+    @property
+    def field_list(self):
+        if not self.annotated_schema:
+            return list(self.definition.keys())
+        else:
+            return [k for k, v in self.annotated_schema["properties"].items() if v.get("selected", False)]
+
+    @property
+    def start_date(self):
+        if self.name in self.client.state:
+            return self.client.state[self.name]
+        else:
+            return self.client.start_date
+
+    def update_state(self, when):
+        if isinstance(when, datetime.datetime):
+            when = singer.utils.strftime(when)
+
+        if when > self.start_date:
+            self.client.state[self.name] = when
+
+    def _where_clause(self, start_date=None, end_date=None):
+        if self.update_field:
+            assert start_date, "Missing start_date"
+            assert end_date, "Missing end_date"
+            return "where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
+                update_field=self.update_field,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            return ""
+
+    def _query_data(self, start_date=None, end_date=None):
+        zoql = "select {fields} from {entity} {where}".format(
+            fields=", ".join(self.field_list),
+            entity=self.name,
+            where=self._where_clause(start_date, end_date),
+        )
+
+        return {
+            "Format": "csv",
+            "Query": zoql,
+        }
+
+    def get_export(self, start_date=None, end_date=None, retry=0):
+        data = self._query_data(start_date, end_date)
+        with singer.stats.Timer(source="export_create") as stats:
+            resp = self.client.post("/object/export", json=data)
+
+        if resp.status_code != 200:
+            raise Exception("API returned an error. status={0.status_code} body={0.content}".format(resp))
+
+        export_id = resp.json()["Id"]
+        time.sleep(5)
+
+        poll = 0
+        failed = False
+        file_id = None
+        while poll < MAX_EXPORT_POLLS and not file_id and not failed:
+            with singer.stats.Timer(source="export_poll") as stats:
+                d = self.client.get("/object/export/{}".format(export_id)).json()
+
+                if d['Status'] == "Completed":
+                    file_id = d['FileId']
+
+                elif d['Status'] == "Failed":
+                    failed = True
+
+                else:
+                    time.sleep(EXPORT_SLEEP_INTERVAL)
+
+            poll += 1
+
+        # If the export timed out, we want to retry until we hit max retries
+        if not file_id:
+            if retry < MAX_EXPORT_TRIES:
+                return self.get_export(start, end, retry + 1)
+            else:
+                raise ExportTimedOutException()
+
+        # If the export failed, we want to retry until we hit max retries
+        if failed:
+            if retry < MAX_EXPORT_TRIES:
+                return self.get_export(start, end, retry + 1)
+            else:
+                raise ExportFailedException()
+
+        # It's completed! Stream down the CSV
+        return self.client.get("/files/{}".format(file_id), stream=True)
+
+    def format_values(self, row):
+        data = {}
+        for k, v in row.items():
+            if k not in self.definition:
+                # This shouldn't get hit since we're spcifying fields, but jic
+                continue
+
+            data[k] = format_value(v, self.definition[k]["type"])
+
+        return data
+
+    def _gen_records(self, start_date=None, end_date=None):
+        with singer.stats.Timer(source=self.name) as stats:
+            stats.record_count = 0
+            stats.byte_count = 0
+
+            lines = self.get_export(start_date, end_date).iter_lines()
+
+            header_line = next(lines)
+            stats.byte_count += len(header_line) + 2
+            headers = parse_header_line(header_line)
+
+            for line in lines:
+                stats.record_count += 1
+                stats.byte_count += len(line) + 2
+                data = parse_line(line)
+                row = dict(zip(headers, data))
+                row = self.format_values(row)
                 yield row
 
-            start_datetime = end_datetime
+    def gen_records(self):
+        if self.update_field:
+            while self.start_date < self.client.now_str:
+                end_date = self.client.get_end_date(self.start_date)
+                for row in self._gen_records(self.start_date, end_date):
+                    yield row
 
-    else:
-        for row in _gen_records(entity, None, None, fields):
-            yield row
+                self.update_state(end_date)
 
-
-def get_entities():
-    xml_str = get("{}/describe".format(BASE_URL)).content
-    et = ElementTree.fromstring(xml_str)
-    return [t.text for t in et.findall('./object/name') if entity_enabled(t.text)]
-
-
-def get_field_schema(field_element):
-    name = field_element.find('name').text
-    type_ = TYPE_MAP.get(field_element.find('type').text, None)
-    required = name == "id" or field_element.find('required').text.lower() == "true"
-    contexts = [e.text for e in field_element.find('contexts').getchildren()]
-    return name, type_, required, contexts
-
-
-def _get_schema(entity):
-    xml_str = get("{}/describe/{}".format(BASE_URL, entity)).content
-    return ElementTree.fromstring(xml_str)
-
-
-def get_schema(entity):
-    et = _get_schema(entity)
-    fields = et.find('fields').getchildren()
-
-    field_dict = {}
-    for field in fields:
-        name, type_, required, contexts = get_field_schema(field)
-        if type_ is None:
-            LOGGER.info("{}.{} has an unsupported field type".format(entity, name))
-        elif "export" not in contexts:
-            LOGGER.debug("{}.{} not available through exports".format(entity, name))
         else:
-            field_dict[name] = {"type": type_, "required": required}
+            for row in self._gen_records():
+                yield row
 
-    return field_dict
+    def sync(self):
+        try:
+            with singer.stats.Counter(source=self.name) as stats:
+                for record in self.gen_records():
+                    singer.write_record(self.name, record)
+                    stats.add(record_count=1)
 
+        except ExportFailedException:
+            # We've tried to get this export multiple times now and each time it's
+            # failed. Move on to the next one but log the error
+            LOGGER.error("{} export exceeded max retries".format(self.name))
 
-def get_json_schema(type_, required, inclusion):
-    rtn = {
-        "inclusion": inclusion,
-    }
-
-    if type_ in ["date", "datetime"]:
-        t = "string"
-        rtn["format"] = "date-time"
-
-    else:
-        t = type_
-
-    if not required:
-        t = [t, "null"]
-
-    rtn["type"] = t
-    return rtn
+        except ExportTimedOutException:
+            # One of the exports for this endpoint timed out
+            # Move onto the next one but log the error occured
+            LOGGER.error("{} export timed out".format(self.name))
 
 
-def discover_field_schema(field_element):
-    name, type_, required, contexts = get_field_schema(field_element)
+class ZuoraClient:
+    def __init__(self, state, annotated_schemas, start_date, api_key, api_secret, sandbox=False, **features):
+        self.start_date = start_date
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self.sandbox = sandbox
+        self.features = features
+        self.session = requests.Session()
+        self.state = state
+        self.annotated_schemas = annotated_schemas["streams"]
 
-    if "export" not in contexts:
-        return None, None
+        self.now_datetime = datetime.datetime.utcnow()
+        self.now_str = singer.utils.strftime(self.now_datetime)
 
-    if name in ["Id", "UpdatedDate", "TransactionDate"]:
-        inclusion = "automatic"
-    else:
-        inclusion = "available"
-
-    return name, get_json_schema(type_, required, inclusion)
-
-
-def discover_schema(entity):
-    et = _get_schema(entity)
-    fields = et.find('fields').getchildren()
-
-    properties = {}
-    for field_entity in fields:
-        name, schema = discover_field_schema(field_entity)
-        if not name:
-            continue
-
-        properties[name] = schema
-
-    schema = {
-        "type": "object",
-        "properties": properties,
-    }
-
-    return schema
-
-
-def discover_schemas():
-    entities = get_entities()
-    schemas = {}
-    for entity in entities:
-        schemas[entity] = discover_schema(entity)
-
-    return schemas
-
-
-def sync_entity(entity, fields=None):
-    LOGGER.info("SYNC: {}".format(entity))
-    SCHEMAS[entity] = get_schema(entity)
-    try:
-        with singer.stats.Counter(source=entity) as stats:
-            for record in gen_records(entity, fields):
-                singer.write_record(entity, record)
-                stats.add(record_count=1)
-
-    except NoSuchDataSourceException:
-        # The "discover" endpoint listed this entity as available
-        # but the API reported that the data source does not exist
-        # Skip this entity and move to the next
-        LOGGER.info("{} not available".format(entity))
-
-    except ExportFailedException:
-        # We've tried to get this export multiple times now and each time it's
-        # failed. Move on to the next one but log the error
-        LOGGER.error("{} export exceeded max retries".format(entity))
-
-    except ExportTimedOutException:
-        # One of the exports for this endpoint timed out
-        # Move onto the next one but log the error occured
-        LOGGER.error("{} export timed out".format(entity))
-
-
-def do_discover():
-    schemas = discover_schemas()
-    for stream, schema in schemas.items():
-        schema["selected"] = True
-        for field, field_schema in schema["properties"].items():
-            field_schema["selected"] = True
-
-    json.dump({"streams": schemas}, sys.stdout, indent=4)
-
-
-def do_sync():
-    for entity in get_entities():
-        entity_properties = PROPERTIES["streams"].get(entity, {})
-        field_properties = entity_properties.get("properties", {})
-
-        if entity_properties.get("selected", False):
-            fields = [k for k, v in field_properties.items() if v.get("selected", False)]
-            sync_entity(entity, fields)
+    @property
+    def base_url(self):
+        if self.sandbox:
+            return BASE_SANDBOX_URL
         else:
-            LOGGER.info("{} is not selected".format(entity))
+            return BASE_URL
+
+    def request(self, method, url, **kwargs):
+        stream = kwargs.pop('stream', False)
+        headers = {
+            'apiAccessKeyId': self.api_key,
+            'apiSecretAccessKey': self.api_secret,
+            'x-zuora-wsdl-version': LATEST_WSDL_VERSION,
+            'Content-Type': 'application/json',
+        }
+        url = self.base_url + url
+        req = requests.Request(method, url, headers=headers, **kwargs).prepare()
+        if "json" in kwargs:
+            LOGGER.info("{}: {} - {}".format(method, req.url, kwargs["json"]))
+        else:
+            LOGGER.info("{}: {}".format(method, req.url))
+
+        return self.session.send(req, stream=stream)
+
+    def get(self, url, **kwargs):
+        return self.request('GET', url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request('POST', url, **kwargs)
+
+    def entity_available(self, entity):
+        if entity not in self.annotated_schemas:
+            return False
+
+        if not self.annotated_schemas[entity].get("selected", False):
+            return False
+
+        if entity in ADVANCED_AR_ENTITIES and not self.features.get("advanced_ar", False):
+            return False
+
+        if entity in ADVANCED_AR_ENTITIES_DEPRECATED and self.features.get("advanced_ar", False):
+            return False
+
+        if entity in CREDIT_BALANCE_ENTITIES and not self.features.get("credit_balance", False):
+            return False
+
+        if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not self.features.get("custom_exchange_rates", False):
+            return False
+
+        if entity in INVOICE_ITEM_ENTITIES and not self.features.get("invoice_item", False):
+            return False
+
+        if entity in ZUORA_REVENUE_ENTITIES and not self.features.get("zuora_revenue", False):
+            return False
+
+        return True
+
+    def get_available_entities(self):
+        xml_str = self.get("/describe").content
+        et = ElementTree.fromstring(xml_str)
+        entity_names = [t.text for t in et.findall('./object/name') if self.entity_available(t.text)]
+        return [ZuoraEntity(self, name, self.annotated_schemas[name]) for name in entity_names]
+
+    def get_end_date(start):
+        if isinstance(start, str):
+            start = singer.utils.strptime(start)
+
+        end_datetime = start + datetime.timedelta(days=EXPORT_DAY_RANGE)
+        if end_datetime >= self.now_datetime:
+            return self.now_datetime
+        else:
+            return singer.utils.strftime(end_datetime)
+
+
+def do_check(client):
+    LOGGER.info("RUNNING IN CHECK MODE")
+    entity = ZuoraEntity(client, "Subscription")
+    entity.sync()
+
+
+def do_discover(client):
+    LOGGER.info("RUNNING IN DISCOVER MODE")
+
+    streams = {}
+    for entity in client.get_available_entities():
+        streams[entity.name] = entity.schema
+        streams[entity.name]["selected"] = True
+
+    json.dump({"streams": streams}, sys.stdout, indent=4)
+
+
+def do_sync(client):
+    LOGGER.info("RUNNING IN SYNC MODE")
+
+    for entity in client.get_available_entities():
+        entity.sync()
 
 
 def main():
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    CONFIG.update(args.config)
-    STATE.update(args.state)
-
-    # Cache now for use later
-    CONFIG['now_datetime'] = datetime.datetime.utcnow()
+    args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
+    client = ZuoraClient(args.state, args.properties, **args.config)
 
     if args.discover:
-        # When running in discover mode we just report the schemas from the API
-        LOGGER.info("RUNNING IN DISCOVER MODE")
-        do_discover()
-
+        do_discover(client)
     elif args.properties:
-        # When properties is set, we have all we need to run the tap
-        # Use properties to determine the tables and fields to sync
-        LOGGER.info("RUNNING IN SYNC MODE")
-        PROPERTIES.update(args.properties)
-        do_sync()
-
+        do_sync(client)
     else:
-        # If no properties are set we must assume we're in check mode
-        # Check mode just syncs the Subscription endpoint and will short-circuit
-        # after a single record is emitted
-        LOGGER.info("RUNNING IN CHECK MODE")
-        sync_entity("Subscription")
+        do_check(client)
+
+
+if __name__ == "__main__":
+    main()
