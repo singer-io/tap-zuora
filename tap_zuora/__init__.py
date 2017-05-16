@@ -20,11 +20,12 @@ BASE_URL = "https://rest.zuora.com/v1"
 BASE_SANDBOX_URL = "https://rest.apisandbox.zuora.com/v1"
 LATEST_WSDL_VERSION = "84.0"
 REQUIRED_CONFIG_KEYS = ["start_date", "api_key", "api_secret"]
-REQUIRED_FIELDS = ["Id", "UpdatedDate", "TransactionDate"]
+REPLICATION_KEYS = ["UpdatedDate", "TransactionDate", "UpdatedOn"]
+REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
 MAX_EXPORT_TRIES = 3        # number of times to rety failed export before ExportFailedException
 MAX_EXPORT_POLLS = 10       # number of times to poll job for completion before ExportTimedOutException
-EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks
+EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks in seconds
 EXPORT_DAY_RANGE = 30       # number of days to export at once
 
 LOGGER = singer.get_logger()
@@ -111,6 +112,12 @@ TYPE_MAP = {
 }
 
 
+class ApiException(Exception):
+    def __init__(self, resp):
+        self.status_code = resp.status_code
+        self.content = resp.content
+
+
 class ExportTimedOutException(Exception):
     pass
 
@@ -122,7 +129,7 @@ class ExportFailedException(Exception):
 def parse_field_element(field_element):
     name = field_element.find('name').text
     type = TYPE_MAP.get(field_element.find('type').text, None)
-    required = name in REQUIRED_FIELDS or field_element.find('required').text.lower() == "true"
+    required = name in REQUIRED_KEYS or field_element.find('required').text.lower() == "true"
     contexts = [t.text for t in field_element.find('contexts').getchildren()]
     return name, type, required, contexts
 
@@ -161,6 +168,30 @@ def parse_line(line):
 
 def parse_header_line(line):
     return [convert_header(h) for h in parse_line(line)]
+
+
+class ZuoraState:
+    def __init__(self, initial_state):
+        self.current_entity = initial_state.get("current_entity")
+        self.state = initial_state.get("bookmarks", {})
+
+    def get_state(self, entity_name):
+        return self.state.get(entity_name)
+
+    def set_state(self, entity_name, when):
+        if isinstance(when, datetime.datetime):
+            when = singer.utils.strftime(when)
+
+        if self.get_state(entity_name) is None or when > self.get_state(entity_name):
+            self.state[entity_name] = when
+            self.stream_state()
+
+    def stream_state(self):
+        state = {
+            "current_entity": self.current_entity,
+            "bookmarks": self.state,
+        }
+        singer.write_state(state)
 
 
 class ZuoraEntity:
@@ -211,7 +242,7 @@ class ZuoraEntity:
             if not field_dict["required"]:
                 d["type"] = [d["type"], "null"]
 
-            if field_name in REQUIRED_FIELDS:
+            if field_name in REQUIRED_KEYS:
                 d['inclusion'] = "automatic"
             else:
                 d['inclusion'] = "available"
@@ -232,36 +263,27 @@ class ZuoraEntity:
 
     @property
     def update_field(self):
-        if "UpdatedDate" in self.definition:
-            return "UpdatedDate"
-        elif "TransactionDate" in self.definition:
-            return "TransactionDate"
+        for key in REPLICATION_KEYS:
+            if key in self.definition:
+                return key
         else:
             return None
 
-    @property
-    def field_query(self):
+    def get_field_query(self):
         if not self.annotated_schema:
             return "*"
         else:
             fields = [k for k, v in self.annotated_schema["properties"].items() if v.get("selected", False)]
             return ", ".join(fields)
 
-    @property
-    def start_date(self):
-        if self.name in self.client.state:
-            return self.client.state[self.name]
+    def get_start_date(self):
+        state = self.client.state.get_state(self.name)
+        if state:
+            return state
         else:
             return self.client.start_date
 
-    def update_state(self, when):
-        if isinstance(when, datetime.datetime):
-            when = singer.utils.strftime(when)
-
-        if when > self.start_date:
-            self.client.state[self.name] = when
-
-    def _where_clause(self, start_date=None, end_date=None):
+    def get_where_clause(self, start_date=None, end_date=None):
         if self.update_field and start_date and end_date:
             return "where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
                 update_field=self.update_field,
@@ -271,41 +293,36 @@ class ZuoraEntity:
         else:
             return ""
 
-    def _zoql(self, start_date=None, end_date=None):
+    def get_zoql(self, start_date=None, end_date=None):
         return "select {fields} from {entity} {where}".format(
-            fields=self.field_query,
+            fields=self.get_field_query(),
             entity=self.name,
-            where=self._where_clause(start_date, end_date),
+            where=self.get_where_clause(start_date, end_date),
         )
 
-    def _query_data(self, start_date=None, end_date=None):
+    def get_query_data(self, start_date=None, end_date=None):
         return {
             "Format": "csv",
-            "Query": self._zoql(start_date, end_date),
+            "Query": self.get_zoql(start_date, end_date),
         }
 
     def get_export(self, start_date=None, end_date=None, retry=0):
-        data = self._query_data(start_date, end_date)
         with singer.stats.Timer(source="export_create") as stats:
-            resp = self.client.post("/object/export", json=data)
+            data = self.client.post("/object/export", json=self.get_query_data(start_date, end_date)).json()
 
-        if resp.status_code != 200:
-            raise Exception("API returned an error. status={0.status_code} body={0.content}".format(resp))
-
-        export_id = resp.json()["Id"]
-        time.sleep(5)
+        export_id = data["Id"]
 
         poll = 0
         failed = False
         file_id = None
         while poll < MAX_EXPORT_POLLS and not file_id and not failed:
             with singer.stats.Timer(source="export_poll") as stats:
-                d = self.client.get("/object/export/{}".format(export_id)).json()
+                poll_data = self.client.get("/object/export/{}".format(export_id)).json()
 
-                if d['Status'] == "Completed":
-                    file_id = d['FileId']
+                if poll_data['Status'] == "Completed":
+                    file_id = poll_data['FileId']
 
-                elif d['Status'] == "Failed":
+                elif poll_data['Status'] == "Failed":
                     failed = True
 
                 else:
@@ -343,18 +360,15 @@ class ZuoraEntity:
 
     def _gen_records(self, start_date=None, end_date=None):
         with singer.stats.Timer(source=self.name) as stats:
-            stats.record_count = 0
-            stats.byte_count = 0
-
             lines = self.get_export(start_date, end_date).iter_lines()
 
             header_line = next(lines)
-            stats.byte_count += len(header_line) + 2
-            headers = parse_header_line(header_line)
+            stats.byte_count = len(header_line) + 2
+            stats.record_count = 0
 
             for line in lines:
-                stats.record_count += 1
                 stats.byte_count += len(line) + 2
+                stats.record_count += 1
                 data = parse_line(line)
                 row = dict(zip(headers, data))
                 row = self.format_values(row)
@@ -362,33 +376,22 @@ class ZuoraEntity:
 
     def gen_records(self):
         if self.update_field:
-            while self.start_date < self.client.now_str:
-                end_date = self.client.get_end_date(self.start_date)
-                for row in self._gen_records(self.start_date, end_date):
+            while self.get_start_date() < self.client.now_str:
+                end_date = self.client.get_end_date(self.get_start_date())
+                for row in self._gen_records(self.get_start_date(), end_date):
                     yield row
 
-                self.update_state(end_date)
+                self.client.state.set_state(self.name, end_date)
 
         else:
             for row in self._gen_records():
                 yield row
 
     def sync(self):
-        try:
-            with singer.stats.Counter(source=self.name) as stats:
-                for record in self.gen_records():
-                    singer.write_record(self.name, record)
-                    stats.add(record_count=1)
-
-        except ExportFailedException:
-            # We've tried to get this export multiple times now and each time it's
-            # failed. Move on to the next one but log the error
-            LOGGER.error("{} export exceeded max retries".format(self.name))
-
-        except ExportTimedOutException:
-            # One of the exports for this endpoint timed out
-            # Move onto the next one but log the error occured
-            LOGGER.error("{} export timed out".format(self.name))
+        with singer.stats.Counter(source=self.name) as stats:
+            for record in self.gen_records():
+                singer.write_record(self.name, record)
+                stats.add(record_count=1)
 
 
 class ZuoraClient:
@@ -399,7 +402,7 @@ class ZuoraClient:
         self.sandbox = sandbox
         self.features = features
         self.session = requests.Session()
-        self.state = state
+        self.state = ZuoraState(state)
         self.annotated_schemas = annotated_schemas
 
         self.now_datetime = datetime.datetime.utcnow()
@@ -431,7 +434,11 @@ class ZuoraClient:
         else:
             LOGGER.info("{}: {}".format(method, req.url))
 
-        return self.session.send(req, stream=stream)
+        resp = self.session.send(req, stream=stream)
+        if resp.status_code != 200:
+            raise ApiException(resp)
+
+        return resp
 
     def get(self, url, **kwargs):
         return self.request('GET', url, **kwargs)
@@ -511,9 +518,27 @@ class ZuoraClient:
 
     def do_sync(self):
         LOGGER.info("RUNNING IN SYNC MODE")
+
+        # Loop through all of the available entities
+        started = False
         for entity in self.get_available_entities():
+            if not started:
+                if self.state.current_entity and entity.name != self.state.current_entity:
+                    continue
+                else:
+                    started = True
+
+            # Mark that the current entity is being processed and stream the
+            # state so that it can be resumed in case of error.
+            self.state.current_entity = entity.name
+            self.state.stream_state()
+
             entity.sync()
 
+            # Unset the current entity as it is now finished. Stream the state
+            # over to mark that there is no current entity.
+            self.state.current_entity = None
+            self.state.stream_state()
 
 
 def main():
