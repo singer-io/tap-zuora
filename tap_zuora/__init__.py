@@ -106,7 +106,7 @@ TYPE_MAP = {
     "text": "string",
     "boolean": "boolean",
     "integer": "integer",
-    "decimal": "float",
+    "decimal": "number",
     "date": "date",
     "datetime": "datetime",
 }
@@ -146,7 +146,7 @@ def format_value(value, type):
 
     if type == "integer":
         return int(value)
-    elif type == "float":
+    elif type == "number":
         return float(value)
     elif type in ["date", "datetime"]:
         return format_zuora_datetime(value)
