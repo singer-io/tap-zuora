@@ -6,11 +6,12 @@ import csv
 import datetime
 import io
 import json
-import requests
 import sys
 import time
+
 from xml.etree import ElementTree
 
+import requests
 import pendulum
 
 import singer
@@ -35,76 +36,73 @@ EXPORT_DAY_RANGE = 30       # number of days to export at once
 
 LOGGER = singer.get_logger()
 
-# These entities aren't documented on
-# https://knowledgecenter.zuora.com/CD_Reporting/D_Data_Sources_and_Exports/AB_Data_Source_Availability
-# but the discover endpoint returns them as available. Don't ever try to get
-# these.
-NEVER_AVAILABLE_ENTITIES = [
-    "ContactSnapshot",
-]
+NEVER_AVAILABLE_ENTITY = 'never_available_entity'
+ADVANCED_AR_ENTITY = 'advanced_ar_entity'
+ADVANCED_AR_DEPRECATED_ENTITY = 'advanced_ar_deprecated_entity'
+CREDIT_BALANCE_ENTITY = 'credit_balance_entity'
+CUSTOM_EXCHANGE_RATES_ENTITY = 'custom_exchange_rates_entity'
+INVOICE_ITEM_ENTITY = 'invoice_item_entity'
+ZUORA_REVENUE_ENTITY = 'zuora_revenue_entity'
 
-# These entities are only available if the Advanced AR Settlement feature is
-# enabled in Zuora.
-ADVANCED_AR_ENTITIES = [
-    "ApplicationGroup",
-    "CreditMemo",
-    "CreditMemoApplication",
-    "CreditMemoApplicationItem",
-    "CreditMemoItem",
-    "CreditMemoPart",
-    "CreditMemoPartItem",
-    "CreditTaxationItem",
-    "DebitMemo",
-    "DebitMemoItem",
-    "DebitTaxationItem",
-    "PaymentApplication",
-    "PaymentPart",
-    "RefundApplication",
-    "RefundPart",
-    "RevenueEventItemCreditMemoItem",
-    "RevenueEventItemDebitMemoItem",
-    "RevenueScheduleItemCreditMemoItem",
-    "RevenueScheduleItemDebitMemoItem",
-]
+def __entity_type(entity):
+    {
+        # These entities aren't documented on
+        # https://knowledgecenter.zuora.com/CD_Reporting/D_Data_Sources_and_Exports/AB_Data_Source_Availability
+        # but the discover endpoint returns them as available. Don't ever try to get
+        # these.
+        "ContactSnapshot": NEVER_AVAILABLE_ENTITY,
 
-# If the Advanced AR Settlement feature in Zuora is enabled, these tables are
-# deprecated.
-ADVANCED_AR_ENTITIES_DEPRECATED = [
-    "CreditBalanceAdjustment",
-    "InvoiceAdjustment",
-    "InvoiceItemAdjustment",
-    "InvoicePayment",
-    "RefundInvoicePayment",
-]
+        # These entities are only available if the Advanced AR Settlement feature is
+        # enabled in Zuora.
+        "ApplicationGroup": ADVANCED_AR_ENTITY,
+        "CreditMemo": ADVANCED_AR_ENTITY,
+        "CreditMemoApplication": ADVANCED_AR_ENTITY,
+        "CreditMemoApplicationItem": ADVANCED_AR_ENTITY,
+        "CreditMemoItem": ADVANCED_AR_ENTITY,
+        "CreditMemoPart": ADVANCED_AR_ENTITY,
+        "CreditMemoPartItem": ADVANCED_AR_ENTITY,
+        "CreditTaxationItem": ADVANCED_AR_ENTITY,
+        "DebitMemo": ADVANCED_AR_ENTITY,
+        "DebitMemoItem": ADVANCED_AR_ENTITY,
+        "DebitTaxationItem": ADVANCED_AR_ENTITY,
+        "PaymentApplication": ADVANCED_AR_ENTITY,
+        "PaymentPart": ADVANCED_AR_ENTITY,
+        "RefundApplication": ADVANCED_AR_ENTITY,
+        "RefundPart": ADVANCED_AR_ENTITY,
+        "RevenueEventItemCreditMemoItem": ADVANCED_AR_ENTITY,
+        "RevenueEventItemDebitMemoItem": ADVANCED_AR_ENTITY,
+        "RevenueScheduleItemCreditMemoItem": ADVANCED_AR_ENTITY,
+        "RevenueScheduleItemDebitMemoItem": ADVANCED_AR_ENTITY,
 
-CREDIT_BALANCE_ENTITIES = [
-    "CreditBalanceAdjustment",
-]
+        # If the Advanced AR Settlement feature in Zuora is enabled, these tables are
+        # deprecated.
+        "CreditBalanceAdjustment": ADVANCED_AR_DEPRECATED_ENTITY,
+        "InvoiceAdjustment": ADVANCED_AR_DEPRECATED_ENTITY,
+        "InvoiceItemAdjustment": ADVANCED_AR_DEPRECATED_ENTITY,
+        "InvoicePayment": ADVANCED_AR_DEPRECATED_ENTITY,
+        "RefundInvoicePayment": ADVANCED_AR_DEPRECATED_ENTITY,
 
-CUSTOM_EXCHANGE_RATES_ENTITIES = [
-    "CustomExchangeRate",
-]
+        # "CreditBalanceAdjustment": CREDIT_BALANCE_ENTITY,
 
-INVOICE_ITEM_ENTITIES = [
-    "PaymentApplicationItem",
-    "PaymentPartItem",
-    "RefundApplicationItem",
-    "RefundPartItem",
-]
+        "CustomExchangeRate": CUSTOM_EXCHANGE_RATES_ENTITY,
 
-ZUORA_REVENUE_ENTITIES = [
-    "RevenueChargeSummaryItem",
-    "RevenueEventItem",
-    "RevenueEventItemCreditMemoItem",
-    "RevenueEventItemDebitMemoItem",
-    "RevenueEventItemInvoiceItem",
-    "RevenueEventItemInvoiceItemAdjustment",
-    "RevenueScheduleItem",
-    "RevenueScheduleItemCreditMemoItem",
-    "RevenueScheduleItemDebitMemoItem",
-    "RevenueScheduleItemInvoiceItem",
-    "RevenueScheduleItemInvoiceItemAdjustment",
-]
+        "PaymentApplicationItem": INVOICE_ITEM_ENTITY,
+        "PaymentPartItem": INVOICE_ITEM_ENTITY,
+        "RefundApplicationItem": INVOICE_ITEM_ENTITY,
+        "RefundPartItem": INVOICE_ITEM_ENTITY,
+
+        "RevenueChargeSummaryItem": ZUORA_REVENUE_ENTITY,
+        "RevenueEventItem": ZUORA_REVENUE_ENTITY,
+        # "RevenueEventItemCreditMemoItem": ZUORA_REVENUE_ENTITY,
+        # "RevenueEventItemDebitMemoItem": ZUORA_REVENUE_ENTITY,
+        "RevenueEventItemInvoiceItem": ZUORA_REVENUE_ENTITY,
+        "RevenueEventItemInvoiceItemAdjustment": ZUORA_REVENUE_ENTITY,
+        "RevenueScheduleItem": ZUORA_REVENUE_ENTITY,
+        # "RevenueScheduleItemCreditMemoItem": ZUORA_REVENUE_ENTITY,
+        # "RevenueScheduleItemDebitMemoItem": ZUORA_REVENUE_ENTITY,
+        "RevenueScheduleItemInvoiceItem": ZUORA_REVENUE_ENTITY,
+        "RevenueScheduleItemInvoiceItemAdjustment": ZUORA_REVENUE_ENTITY,
+    }.get(entity, 'default')
 
 TYPE_MAP = {
     "picklist": "string",
@@ -314,7 +312,7 @@ class ZuoraEntity:
         if state:
             return state
 
-        return self.client.start_date
+        return self.client.config['start_date']
 
     def get_where_clause(self, start_date=None, end_date=None):
         "Return an appropriate where clause for self, start_date, and end_date"
@@ -439,93 +437,94 @@ class ZuoraEntity:
 
 class ZuoraClient:
     "Encapsulate talking to Zuora"
-    def __init__(self,
-                 state,
-                 annotated_schemas,
-                 start_date,
-                 api_key,
-                 api_secret,
-                 sandbox=False,
-                 **features):
-        self.start_date = start_date
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.sandbox = sandbox
-        self.features = features
-        self.session = requests.Session()
+    def __init__(self, state, properties, config):
         self.state = ZuoraState(state)
-        self.annotated_schemas = annotated_schemas
+        # The properties arg is renamed to annotated_schemas for clarity
+        self.annotated_schemas = properties
+        self.config = config
 
-        self.now_datetime = datetime.datetime.utcnow()
-        self.now_str = singer.utils.strftime(self.now_datetime)
+        # internal
+        self._session = requests.Session()
+        self._now_datetime = datetime.datetime.utcnow()
 
     @classmethod
     def from_args(cls, args):
-        return cls(args.state, args.properties, **args.config)
+        "Factory for ZuoraClient"
+        return cls(args.state, args.properties, args.config)
 
     @property
     def base_url(self):
-        if self.sandbox:
+        "Sandbox or Real URL for self"
+        if self.config.get('sandbox', False):
             return BASE_SANDBOX_URL
-        else:
-            return BASE_URL
+
+        return BASE_URL
+
+    @property
+    def now_str(self):
+        "Returns start of run as string"
+        return singer.utils.strftime(self._now_datetime)
 
     def request(self, method, url, **kwargs):
+        "Make an api request"
         stream = kwargs.pop('stream', False)
         headers = {
-            'apiAccessKeyId': self.api_key,
-            'apiSecretAccessKey': self.api_secret,
+            'apiAccessKeyId': self.config['api_key'],
+            'apiSecretAccessKey': self.config['api_secret'],
             'x-zuora-wsdl-version': LATEST_WSDL_VERSION,
             'Content-Type': 'application/json',
         }
         url = self.base_url + url
         req = requests.Request(method, url, headers=headers, **kwargs).prepare()
         if "json" in kwargs:
-            LOGGER.info("{}: {} - {}".format(method, req.url, kwargs["json"]))
+            LOGGER.info("%s: %s - %s", method, req.url, kwargs["json"])
         else:
-            LOGGER.info("{}: {}".format(method, req.url))
+            LOGGER.info("%s: %s", method, req.url)
 
-        resp = self.session.send(req, stream=stream)
+        resp = self._session.send(req, stream=stream)
         if resp.status_code != 200:
             raise ApiException(resp)
 
         return resp
 
     def get(self, url, **kwargs):
+        "Make a get request against the API"
         return self.request('GET', url, **kwargs)
 
     def post(self, url, **kwargs):
+        "Make a post request against the API"
         return self.request('POST', url, **kwargs)
 
+    def __has_advanced_ar_access(self):
+        return self.config['features'].get("advanced_ar", False)
+
+    def __has_credit_balance_access(self):
+        return not self.config['features'].get("credit_balance", False)
+
+    def __has_custom_exchange_rate_access(self):
+        return self.config['features'].get("custom_exchange_rates", False)
+
+    def __has_invoice_item_access(self):
+        return self.config['features'].get("invoice_item", False)
+
+    def __has_zuora_revenue_access(self):
+        return self.config['features'].get("zuora_revenue", False)
+
     def entity_available(self, entity):
-        if entity in NEVER_AVAILABLE_ENTITIES:
-            return False
-
-        if entity in ADVANCED_AR_ENTITIES and not self.features.get("advanced_ar", False):
-            return False
-
-        if entity in ADVANCED_AR_ENTITIES_DEPRECATED and self.features.get("advanced_ar", False):
-            return False
-
-        if entity in CREDIT_BALANCE_ENTITIES and not self.features.get("credit_balance", False):
-            return False
-
-        if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not self.features.get(
-                "custom_exchange_rates", False):
-            return False
-
-        if entity in INVOICE_ITEM_ENTITIES and not self.features.get("invoice_item", False):
-            return False
-
-        if entity in ZUORA_REVENUE_ENTITIES and not self.features.get("zuora_revenue", False):
-            return False
-
-        return True
+        "Configure entity's availability"
+        return {
+            NEVER_AVAILABLE_ENTITY: (lambda: False),
+            ADVANCED_AR_ENTITY: (lambda: not self.__has_advanced_ar_access()),
+            ADVANCED_AR_DEPRECATED_ENTITY: self.__has_advanced_ar_access,
+            CREDIT_BALANCE_ENTITY: self.__has_credit_balance_access,
+            CUSTOM_EXCHANGE_RATES_ENTITY: self.__has_custom_exchange_rate_access,
+        }.get(__entity_type(entity), lambda: True)()
 
     def get_available_entities(self):
+        "Get all available entities"
         xml_str = self.get("/describe").content
-        et = ElementTree.fromstring(xml_str)
-        entity_names = (t.text for t in et.findall('./object/name')
+        etree = ElementTree.fromstring(xml_str)
+        entity_names = (t.text for t in etree.findall('./object/name')
                         if self.entity_available(t.text))
 
         entities = []
@@ -546,21 +545,24 @@ class ZuoraClient:
         return entities
 
     def get_end_date(self, start):
+        "Get the proper end date for self"
         if isinstance(start, str):
             start = singer.utils.strptime(start)
 
         end_datetime = start + datetime.timedelta(days=EXPORT_DAY_RANGE)
-        if end_datetime >= self.now_datetime:
-            return self.now_datetime
-        else:
-            return singer.utils.strftime(end_datetime)
+        if end_datetime >= self._now_datetime:
+            return self._now_datetime
+
+        return singer.utils.strftime(end_datetime)
 
     def do_check(self):
+        "Do a connection check"
         LOGGER.info("RUNNING IN CHECK MODE")
         entity = ZuoraEntity(self, "Subscription")
         entity.sync()
 
     def do_discover(self):
+        "Do schema discovery"
         LOGGER.info("RUNNING IN DISCOVER MODE")
         streams = {}
         for entity in self.get_available_entities():
@@ -570,6 +572,7 @@ class ZuoraClient:
         json.dump({"streams": streams}, sys.stdout, indent=4)
 
     def do_sync(self):
+        "Do a data sync"
         LOGGER.info("RUNNING IN SYNC MODE")
 
         # Loop through all of the available entities
@@ -595,6 +598,7 @@ class ZuoraClient:
 
 
 def main():
+    "Zuora's main entry point"
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
     client = ZuoraClient.from_args(args)
 
