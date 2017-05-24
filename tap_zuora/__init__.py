@@ -44,8 +44,9 @@ CUSTOM_EXCHANGE_RATES_ENTITY = 'custom_exchange_rates_entity'
 INVOICE_ITEM_ENTITY = 'invoice_item_entity'
 ZUORA_REVENUE_ENTITY = 'zuora_revenue_entity'
 
-def __entity_type(entity):
-    {
+def entity_type(entity):
+    "Type of entity"
+    return {
         # These entities aren't documented on
         # https://knowledgecenter.zuora.com/CD_Reporting/D_Data_Sources_and_Exports/AB_Data_Source_Availability
         # but the discover endpoint returns them as available. Don't ever try to get
@@ -442,6 +443,8 @@ class ZuoraClient:
         # The properties arg is renamed to annotated_schemas for clarity
         self.annotated_schemas = properties
         self.config = config
+        if 'features' not in self.config:
+            self.config['features'] = {}
 
         # internal
         self._session = requests.Session()
@@ -518,7 +521,7 @@ class ZuoraClient:
             ADVANCED_AR_DEPRECATED_ENTITY: self.__has_advanced_ar_access,
             CREDIT_BALANCE_ENTITY: self.__has_credit_balance_access,
             CUSTOM_EXCHANGE_RATES_ENTITY: self.__has_custom_exchange_rate_access,
-        }.get(__entity_type(entity), lambda: True)()
+        }.get(entity_type(entity), lambda: True)()
 
     def get_available_entities(self):
         "Get all available entities"
@@ -536,7 +539,7 @@ class ZuoraClient:
                 if not self.annotated_schemas["streams"][entity_name].get("selected", False):
                     continue
 
-                annotated_schema = self.annotated_schemas["streams"]
+                annotated_schema = self.annotated_schemas["streams"][entity_name]
             else:
                 annotated_schema = None
 
