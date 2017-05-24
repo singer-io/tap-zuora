@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+"""
+singer.io Zuora tap
+"""
 
 import csv
 import datetime
@@ -23,9 +25,12 @@ REQUIRED_CONFIG_KEYS = ["start_date", "api_key", "api_secret"]
 REPLICATION_KEYS = ["UpdatedDate", "TransactionDate", "UpdatedOn"]
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
-MAX_EXPORT_TRIES = 3        # number of times to rety failed export before ExportFailedException
-MAX_EXPORT_POLLS = 10       # number of times to poll job for completion before ExportTimedOutException
-EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks in seconds
+MAX_EXPORT_TRIES = 3        # number of times to rety failed export before
+                            # ExportFailedException
+MAX_EXPORT_POLLS = 10       # number of times to poll job for completion
+                            # before ExportTimedOutException
+EXPORT_SLEEP_INTERVAL = 30  # sleep time between export status checks in
+                            # seconds
 EXPORT_DAY_RANGE = 30       # number of days to export at once
 
 LOGGER = singer.get_logger()
@@ -113,72 +118,92 @@ TYPE_MAP = {
 
 
 class ApiException(Exception):
+    """
+    Thrown when the API behaves unexpectedly.
+    """
+
     def __init__(self, resp):
+        super(ApiException, self).__init__("Bad API response")
         self.status_code = resp.status_code
         self.content = resp.content
 
 
 class ExportTimedOutException(Exception):
+    "Thrown when Zuora has not finished the export within MAX_EXPORT_POLLS"
     pass
 
 
 class ExportFailedException(Exception):
+    "Thrown when Zuora has reported the export as Failed."
     pass
 
 
 def parse_field_element(field_element):
+    """Extract name, field_type, required, and contexts from a
+field_element."""
     name = field_element.find('name').text
-    type = TYPE_MAP.get(field_element.find('type').text, None)
+    field_type = TYPE_MAP.get(field_element.find('type').text, None)
     required = name in REQUIRED_KEYS or field_element.find('required').text.lower() == "true"
     contexts = [t.text for t in field_element.find('contexts').getchildren()]
-    return name, type, required, contexts
+    return name, field_type, required, contexts
 
 
-def format_zuora_datetime(datetime):
-    datetime = pendulum.parse(datetime)
-    datetime = datetime.in_timezone('utc')
-    return singer.utils.strftime(datetime._datetime)
+def format_zuora_datetime(datetime_str):
+    "format datetime_str as the corresponding time in UTC"
+    datetime_dt = pendulum.parse(datetime_str).in_timezone('utc')
+    return singer.utils.strftime(datetime_dt)
 
 
-def format_value(value, type):
+def format_value(value, field_type):
+    "parse value according to field_type"
     if value == "":
         return None
 
-    if type == "integer":
+    if field_type == "integer":
         return int(value)
-    elif type == "number":
+
+    if field_type == "number":
         return float(value)
-    elif type in ["date", "datetime"]:
+
+    if field_type in ["date", "datetime"]:
         return format_zuora_datetime(value)
-    elif type == "boolean":
+
+    if field_type == "boolean":
         return value.lower() == "true"
-    else:
-        return value
 
-
-def convert_header(header):
-    _, header = header.split(".", 1)
-    return header
+    return value
 
 
 def parse_line(line):
+    "Decode line as utf-8 and parse it as csv"
     reader = csv.reader(io.StringIO(line.decode('utf-8')))
     return next(reader)
 
 
+def convert_header(header):
+    "Strip leading *. off of header column name"
+    _, header = header.split(".", 1)
+    return header
+
+
 def parse_header_line(line):
+    "Strip leading *. off of each column name and return as list"
     return [convert_header(h) for h in parse_line(line)]
 
 
 class ZuoraState:
+    "Data bag for zuora state"
+
     def __init__(self, initial_state):
         self.current_entity = initial_state.get("current_entity")
         self.state = initial_state.get("bookmarks", {})
 
     def get_state(self, entity_name):
+        "Return state of entity_name"
         return self.state.get(entity_name)
 
     def set_state(self, entity_name, when):
+        "Set state for entity_name"
         if isinstance(when, datetime.datetime):
             when = singer.utils.strftime(when)
 
@@ -187,6 +212,7 @@ class ZuoraState:
             self.stream_state()
 
     def stream_state(self):
+        "Write state to output stream"
         state = {
             "current_entity": self.current_entity,
             "bookmarks": self.state,
@@ -195,32 +221,35 @@ class ZuoraState:
 
 
 class ZuoraEntity:
+    "Class representing Entitities returned by Zuora's describe API"
+
     def __init__(self, client, name, annotated_schema=None):
         self.client = client
         self.name = name
-        self.annotated_schema = None
+        self.annotated_schema = annotated_schema
         self._schema = None
         self._definition = None
 
     def _get_definition(self):
         """This will define the entity."""
         xml_str = self.client.get("/describe/{}".format(self.name)).content
-        et = ElementTree.fromstring(xml_str)
+        etree = ElementTree.fromstring(xml_str)
 
         field_dict = {}
-        for field_element in et.find('fields').getchildren():
-            name, type, required, contexts = parse_field_element(field_element)
-            if type is None:
-                LOGGER.debug("{}.{} has an unsupported data type".format(self.name, name))
+        for field_element in etree.find('fields').getchildren():
+            name, field_type, required, contexts = parse_field_element(field_element)
+            if field_type is None:
+                LOGGER.debug("%s.%s has an unsupported data type", self.name, name)
             elif "export" not in contexts:
-                LOGGER.debug("{}.{} not available".format(self.name, name))
+                LOGGER.debug("%s.%s not available", self.name, name)
             else:
-                field_dict[name] = {"type": type, "required": required}
+                field_dict[name] = {"type": field_type, "required": required}
 
         return field_dict
 
     @property
     def definition(self):
+        "Cache and return or simply return definition for self from API"
         if not self._definition:
             self._definition = self._get_definition()
 
@@ -230,24 +259,24 @@ class ZuoraEntity:
         """This will generate the schema for discovery mode."""
         properties = {}
         for field_name, field_dict in self.definition.items():
-            d = {}
-            d["selected"] = True
+            field_properties = {}
+            field_properties["selected"] = True
 
             if field_dict["type"] in ["date", "datetime"]:
-                d["type"] = "string"
-                d["format"] = "date-time"
+                field_properties["type"] = "string"
+                field_properties["format"] = "date-time"
             else:
-                d["type"] = field_dict["type"]
+                field_properties["type"] = field_dict["type"]
 
             if not field_dict["required"]:
-                d["type"] = [d["type"], "null"]
+                field_properties["type"] = [field_properties["type"], "null"]
 
             if field_name in REQUIRED_KEYS:
-                d['inclusion'] = "automatic"
+                field_properties['inclusion'] = "automatic"
             else:
-                d['inclusion'] = "available"
+                field_properties['inclusion'] = "available"
 
-            properties[field_name] = d
+            properties[field_name] = field_properties
 
         return {
             "type": "object",
@@ -256,6 +285,7 @@ class ZuoraEntity:
 
     @property
     def schema(self):
+        "Cache and return or simply return schema for self from API"
         if not self._schema:
             self._schema = self._get_schema()
 
@@ -263,37 +293,43 @@ class ZuoraEntity:
 
     @property
     def update_field(self):
+        "Returns the first key in self that is a REPLICATION_KEYS"
         for key in REPLICATION_KEYS:
             if key in self.definition:
                 return key
-        else:
-            return None
 
     def get_field_query(self):
+        "Return an query for self.annotated_schema"
         if not self.annotated_schema:
             return "*"
-        else:
-            fields = [k for k, v in self.annotated_schema["properties"].items() if v.get("selected", False)]
-            return ", ".join(fields)
+
+        fields = [k for k, v
+                  in self.annotated_schema["properties"].items()
+                  if v.get("selected", False)]
+        return ", ".join(fields)
 
     def get_start_date(self):
+        "Return the current bookmark for self or the default start_date"
         state = self.client.state.get_state(self.name)
         if state:
             return state
-        else:
-            return self.client.start_date
+
+        return self.client.start_date
 
     def get_where_clause(self, start_date=None, end_date=None):
+        "Return an appropriate where clause for self, start_date, and end_date"
         if self.update_field and start_date and end_date:
-            return "where {update_field} >= '{start_date}' and {update_field} < '{end_date}'".format(
-                update_field=self.update_field,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            return ""
+            return ("where {update_field} >= '{start_date}' "
+                    "and {update_field} < '{end_date}'").format(
+                        update_field=self.update_field,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+
+        return ""
 
     def get_zoql(self, start_date=None, end_date=None):
+        "Generate a ZOQL query for self"
         return "select {fields} from {entity} {where}".format(
             fields=self.get_field_query(),
             entity=self.name,
@@ -301,14 +337,18 @@ class ZuoraEntity:
         )
 
     def get_query_data(self, start_date=None, end_date=None):
+        "Get body for ZOQL query request"
         return {
             "Format": "csv",
             "Query": self.get_zoql(start_date, end_date),
         }
 
     def get_export(self, start_date=None, end_date=None, retry=0):
-        with singer.stats.Timer(source="export_create") as stats:
-            data = self.client.post("/object/export", json=self.get_query_data(start_date, end_date)).json()
+        "Create an export"
+        with singer.stats.Timer(source="export_create"):
+            data = self.client.post("/object/export",
+                                    json=self.get_query_data(
+                                        start_date, end_date)).json()
 
         export_id = data["Id"]
 
@@ -316,7 +356,7 @@ class ZuoraEntity:
         failed = False
         file_id = None
         while poll < MAX_EXPORT_POLLS and not file_id and not failed:
-            with singer.stats.Timer(source="export_poll") as stats:
+            with singer.stats.Timer(source="export_poll"):
                 poll_data = self.client.get("/object/export/{}".format(export_id)).json()
 
                 if poll_data['Status'] == "Completed":
@@ -334,27 +374,28 @@ class ZuoraEntity:
         if not file_id:
             if retry < MAX_EXPORT_TRIES:
                 LOGGER.error("Export timed out. Retrying")
-                return self.get_export(start, end, retry + 1)
+                return self.get_export(start_date, end_date, retry + 1)
             else:
-                LOGGER.error("Export timed out {} times. Aborting".format(MAX_EXPORT_TRIES))
+                LOGGER.error("Export timed out %s times. Aborting", MAX_EXPORT_TRIES)
                 raise ExportTimedOutException()
 
         # If the export failed, we want to retry until we hit max retries
         if failed:
-            LOGGER.error("Export failed".format(MAX_EXPORT_TRIES))
+            LOGGER.error("Export failed: %s", MAX_EXPORT_TRIES)
             raise ExportFailedException()
 
         # It's completed! Stream down the CSV
         return self.client.get("/files/{}".format(file_id), stream=True)
 
     def format_values(self, row):
+        "Format every value for the row"
         data = {}
-        for k, v in row.items():
-            if k not in self.definition:
-                # This shouldn't get hit since we're spcifying fields, but jic
+        for key, value in row.items():
+            if key not in self.definition:
+                # This shouldn't get hit since we're specifying fields, but jic
                 continue
 
-            data[k] = format_value(v, self.definition[k]["type"])
+            data[key] = format_value(value, self.definition[key]["type"])
 
         return data
 
@@ -370,11 +411,12 @@ class ZuoraEntity:
                 stats.byte_count += len(line) + 2
                 stats.record_count += 1
                 data = parse_line(line)
-                row = dict(zip(headers, data))
+                row = dict(zip(parse_header_line(header_line), data))
                 row = self.format_values(row)
                 yield row
 
     def gen_records(self):
+        "Yield records from an export for self"
         if self.update_field:
             while self.get_start_date() < self.client.now_str:
                 end_date = self.client.get_end_date(self.get_start_date())
@@ -388,6 +430,7 @@ class ZuoraEntity:
                 yield row
 
     def sync(self):
+        "Write records for self to stream"
         with singer.stats.Counter(source=self.name) as stats:
             for record in self.gen_records():
                 singer.write_record(self.name, record)
@@ -395,7 +438,15 @@ class ZuoraEntity:
 
 
 class ZuoraClient:
-    def __init__(self, state, annotated_schemas, start_date, api_key, api_secret, sandbox=False, **features):
+    "Encapsulate talking to Zuora"
+    def __init__(self,
+                 state,
+                 annotated_schemas,
+                 start_date,
+                 api_key,
+                 api_secret,
+                 sandbox=False,
+                 **features):
         self.start_date = start_date
         self.api_key = api_key
         self.api_secret = api_secret
@@ -459,7 +510,8 @@ class ZuoraClient:
         if entity in CREDIT_BALANCE_ENTITIES and not self.features.get("credit_balance", False):
             return False
 
-        if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not self.features.get("custom_exchange_rates", False):
+        if entity in CUSTOM_EXCHANGE_RATES_ENTITIES and not self.features.get(
+                "custom_exchange_rates", False):
             return False
 
         if entity in INVOICE_ITEM_ENTITIES and not self.features.get("invoice_item", False):
@@ -473,7 +525,8 @@ class ZuoraClient:
     def get_available_entities(self):
         xml_str = self.get("/describe").content
         et = ElementTree.fromstring(xml_str)
-        entity_names = (t.text for t in et.findall('./object/name') if self.entity_available(t.text))
+        entity_names = (t.text for t in et.findall('./object/name')
+                        if self.entity_available(t.text))
 
         entities = []
         for entity_name in entity_names:
