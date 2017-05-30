@@ -22,7 +22,7 @@ import singer.utils
 BASE_URL = "https://rest.zuora.com/v1"
 BASE_SANDBOX_URL = "https://rest.apisandbox.zuora.com/v1"
 LATEST_WSDL_VERSION = "84.0"
-REQUIRED_CONFIG_KEYS = ["start_date", "api_key", "api_secret"]
+REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 REPLICATION_KEYS = ["UpdatedDate", "TransactionDate", "UpdatedOn"]
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
@@ -472,8 +472,11 @@ class ZuoraClient:
         "Make an api request"
         stream = kwargs.pop('stream', False)
         headers = {
-            'apiAccessKeyId': self.config['api_key'],
-            'apiSecretAccessKey': self.config['api_secret'],
+            # Zuora's API requires these names (apiAccessKeyId and
+            # apiSecretAccessKey), but the actual values are in fact
+            # username and password.
+            'apiAccessKeyId': self.config['username'],
+            'apiSecretAccessKey': self.config['password'],
             'x-zuora-wsdl-version': LATEST_WSDL_VERSION,
             'Content-Type': 'application/json',
         }
