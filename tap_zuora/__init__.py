@@ -430,6 +430,7 @@ class ZuoraEntity:
 
     def sync(self):
         "Write records for self to stream"
+        singer.write_schema(self.name, self.schema, ["Id"])
         with singer.stats.Counter(source=self.name) as stats:
             for record in self.gen_records():
                 singer.write_record(self.name, record)
