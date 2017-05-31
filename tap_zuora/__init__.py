@@ -2,10 +2,12 @@
 singer.io Zuora tap
 """
 
+import copy
 import csv
 import datetime
 import io
 import json
+import re
 import sys
 import time
 
@@ -267,7 +269,19 @@ class ZuoraEntity:
             else:
                 field_properties["type"] = field_dict["type"]
 
-            if not field_dict["required"]:
+            # Zuora's API currently lies about these. If this list grows
+            # any more it's probably time to figure out a different
+            # solution
+
+            # pylint: disable=too-many-boolean-expressions
+            if not field_dict["required"] \
+               or (self.name == 'Export' and field_name == 'Size') \
+               or (self.name == 'Import' and field_name == 'TotalCount') \
+               or (self.name == 'Import' and field_name == 'ResultResourceUrl') \
+               or (self.name == 'InvoiceItem' and field_name == 'UOM') \
+               or (self.name == 'Payment' and field_name == 'GatewayResponse') \
+               or (self.name == 'Payment' and field_name == 'GatewayResponseCode') \
+               or (self.name == 'RatePlanCharge' and field_name == 'UOM'):
                 field_properties["type"] = [field_properties["type"], "null"]
 
             if field_name in REQUIRED_KEYS:
@@ -437,6 +451,17 @@ class ZuoraEntity:
                 stats.add(record_count=1)
 
 
+def _scrub_headers(headers):
+    scrubbed_headers = copy.deepcopy(headers)
+    scrubbed_headers['apiAccessKeyId'] = re.sub(r'(.{3}).+(.{3})',
+                                                r'\1***\2',
+                                                scrubbed_headers['apiAccessKeyId'])
+    scrubbed_headers['apiSecretAccessKey'] = re.sub(r'(.{3}).+(.{3})',
+                                                    r'\1***\2',
+                                                    scrubbed_headers['apiSecretAccessKey'])
+    return scrubbed_headers
+
+
 class ZuoraClient:
     "Encapsulate talking to Zuora"
     def __init__(self, state, properties, config):
@@ -490,6 +515,13 @@ class ZuoraClient:
 
         resp = self._session.send(req, stream=stream)
         if resp.status_code != 200:
+            LOGGER.info("Non-200 from API: %s, %s, %s, %s, %s, %s",
+                        method,
+                        url,
+                        _scrub_headers(headers),
+                        kwargs,
+                        resp.status_code,
+                        resp.content)
             raise ApiException(resp)
 
         return resp
@@ -502,29 +534,29 @@ class ZuoraClient:
         "Make a post request against the API"
         return self.request('POST', url, **kwargs)
 
-    def __has_advanced_ar_access(self):
+    def _has_advanced_ar_access(self):
         return self.config['features'].get("advanced_ar", False)
 
-    def __has_credit_balance_access(self):
+    def _has_credit_balance_access(self):
         return not self.config['features'].get("credit_balance", False)
 
-    def __has_custom_exchange_rate_access(self):
+    def _has_custom_exchange_rate_access(self):
         return self.config['features'].get("custom_exchange_rates", False)
 
-    def __has_invoice_item_access(self):
+    def _has_invoice_item_access(self):
         return self.config['features'].get("invoice_item", False)
 
-    def __has_zuora_revenue_access(self):
+    def _has_zuora_revenue_access(self):
         return self.config['features'].get("zuora_revenue", False)
 
     def entity_available(self, entity):
         "Configure entity's availability"
         return {
             NEVER_AVAILABLE_ENTITY: (lambda: False),
-            ADVANCED_AR_ENTITY: (lambda: not self.__has_advanced_ar_access()),
-            ADVANCED_AR_DEPRECATED_ENTITY: self.__has_advanced_ar_access,
-            CREDIT_BALANCE_ENTITY: self.__has_credit_balance_access,
-            CUSTOM_EXCHANGE_RATES_ENTITY: self.__has_custom_exchange_rate_access,
+            ADVANCED_AR_ENTITY: (lambda: not self._has_advanced_ar_access()),
+            ADVANCED_AR_DEPRECATED_ENTITY: self._has_advanced_ar_access,
+            CREDIT_BALANCE_ENTITY: self._has_credit_balance_access,
+            CUSTOM_EXCHANGE_RATES_ENTITY: self._has_custom_exchange_rate_access,
         }.get(entity_type(entity), lambda: True)()
 
     def get_available_entities(self):
