@@ -17,7 +17,7 @@ import requests
 import pendulum
 
 import singer
-import singer.stats
+import singer.metrics as metrics
 import singer.utils
 
 
@@ -358,7 +358,7 @@ class ZuoraEntity:
 
     def get_export(self, start_date=None, end_date=None, retry=0):
         "Create an export"
-        with singer.stats.Timer(source="export_create"):
+        with metrics.http_request_timer("export_create"):
             data = self.client.post("/object/export",
                                     json=self.get_query_data(
                                         start_date, end_date)).json()
@@ -368,20 +368,24 @@ class ZuoraEntity:
         poll = 0
         failed = False
         file_id = None
-        while poll < MAX_EXPORT_POLLS and not file_id and not failed:
-            with singer.stats.Timer(source="export_poll"):
-                poll_data = self.client.get("/object/export/{}".format(export_id)).json()
+        # Time a single attempt of the export, separately from the timing
+        # for the whole export process, which includes possibly retrying
+        # the job multiple times and downloading the CSV.
+        with metrics.job_timer('export_attempt'):
+            while poll < MAX_EXPORT_POLLS and not file_id and not failed:
+                with metrics.http_request_timer("export_poll"):
+                    poll_data = self.client.get("/object/export/{}".format(export_id)).json()
 
-                if poll_data['Status'] == "Completed":
-                    file_id = poll_data['FileId']
+                    if poll_data['Status'] == "Completed":
+                        file_id = poll_data['FileId']
 
-                elif poll_data['Status'] == "Failed":
-                    failed = True
+                    elif poll_data['Status'] == "Failed":
+                        failed = True
 
-                else:
-                    time.sleep(EXPORT_SLEEP_INTERVAL)
+                    else:
+                        time.sleep(EXPORT_SLEEP_INTERVAL)
 
-            poll += 1
+                poll += 1
 
         # If the export timed out, we want to retry until we hit max retries
         if not file_id:
@@ -413,20 +417,16 @@ class ZuoraEntity:
         return data
 
     def _gen_records(self, start_date=None, end_date=None):
-        with singer.stats.Timer(source=self.name) as stats:
+        with metrics.job_timer('export'):
             lines = self.get_export(start_date, end_date).iter_lines()
 
-            header_line = next(lines)
-            stats.byte_count = len(header_line) + 2
-            stats.record_count = 0
+        header_line = next(lines)
 
-            for line in lines:
-                stats.byte_count += len(line) + 2
-                stats.record_count += 1
-                data = parse_line(line)
-                row = dict(zip(parse_header_line(header_line), data))
-                row = self.format_values(row)
-                yield row
+        for line in lines:
+            data = parse_line(line)
+            row = dict(zip(parse_header_line(header_line), data))
+            row = self.format_values(row)
+            yield row
 
     def gen_records(self):
         "Yield records from an export for self"
@@ -445,10 +445,10 @@ class ZuoraEntity:
     def sync(self):
         "Write records for self to stream"
         singer.write_schema(self.name, self.schema, ["Id"])
-        with singer.stats.Counter(source=self.name) as stats:
+        with metrics.record_counter(self.name) as counter:
             for record in self.gen_records():
                 singer.write_record(self.name, record)
-                stats.add(record_count=1)
+                counter.increment()
 
 
 def _scrub_headers(headers):
