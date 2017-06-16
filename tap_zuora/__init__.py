@@ -567,15 +567,19 @@ class ZuoraClient:
                         if self.entity_available(t.text))
 
         entities = []
+        selected_streams = {}
+
+        if self.annotated_schemas and 'streams' in self.annotated_schemas:
+            for s in self.annotated_schemas['streams']:
+                if s['schema'].get('selected', False):
+                    selected_streams[s['stream']] = s['schema']
+
         for entity_name in entity_names:
             if self.annotated_schemas and "streams" in self.annotated_schemas:
-                if entity_name not in self.annotated_schemas["streams"]:
+                if entity_name not in selected_streams:
                     continue
 
-                if not self.annotated_schemas["streams"][entity_name].get("selected", False):
-                    continue
-
-                annotated_schema = self.annotated_schemas["streams"][entity_name]
+                annotated_schema = selected_streams[entity_name]
             else:
                 annotated_schema = None
 
@@ -603,10 +607,13 @@ class ZuoraClient:
     def do_discover(self):
         "Do schema discovery"
         LOGGER.info("RUNNING IN DISCOVER MODE")
-        streams = {}
+        streams = []
         for entity in self.get_available_entities():
-            streams[entity.name] = entity.schema
-            streams[entity.name]["selected"] = True
+            schema = entity.schema
+            schema["selected"] = True
+            streams.append({'stream': entity.name,
+                            'tap_stream_id': entity.name,
+                            'schema': schema})
 
         json.dump({"streams": streams}, sys.stdout, indent=4)
 
