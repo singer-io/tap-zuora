@@ -1,10 +1,13 @@
 from collections import namedtuple
 
-from tap_zuora.state import State
-from tap_zuora.entity import Entity
 from tap_zuora.client import Client
-from tap_zuora.streamer import AquaStreamer
 from tap_zuora.discover import discover_entities
+from tap_zuora.entity import Entity
+from tap_zuora.state import State
+from tap_zuora.streamer import (
+    AquaStreamer,
+    RestStreamer,
+)
 
 import singer
 from singer import catalog
@@ -26,8 +29,16 @@ def do_discover(client):
     LOGGER.info("Finished discover")
 
 
-def do_sync(client, state, catalog):
+def do_sync(client, state, catalog, force_rest=False):
     LOGGER.info("Starting sync")
+
+    if force_rest:
+        LOGGER.info("Using REST API")
+        Streamer = RestStreamer
+    else:
+        LOGGER.info("Using AQuA API")
+        Streamer = AquaStreamer
+
     started = False
     for catalog_entry in catalog.streams:
         if not started and state.current_stream and catalog_entry.tap_stream_id != state.current_stream:
@@ -47,7 +58,7 @@ def do_sync(client, state, catalog):
             replication_key=catalog_entry.replication_key,
             key_properties=catalog_entry.key_properties,
         )
-        streamer = AquaStreamer(entity, client, state)
+        streamer = Streamer(entity, client, state)
 
         state.current_stream = entity.name
         singer.write_state(state.to_dict())
@@ -81,7 +92,7 @@ def main(config, state_dict, properties=None, discover=False):
     elif properties:
         state = State(state_dict, config["start_date"])
         catalog = catalog.Catalog(annotated_schemas)
-        do_sync(client, state, catalog)
+        do_sync(client, state, catalog, config.get("force_rest", False))
     else:
         raise Exception("Must have properties or run discovery")
 
