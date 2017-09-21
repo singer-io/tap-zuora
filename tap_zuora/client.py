@@ -2,12 +2,16 @@ import requests
 
 import singer
 
-# The keys are hashes of (sandbox, european) booleans
+# The keys are hashes of (rest, sandbox, european) booleans
 URLS = {
-    (False, False): "https://www.zuora.com/",
-    (True, False): "https://apisandbox.zuora.com/",
-    (False, True): "https://rest.sandbox.eu.zuora.com/",
-    (True, True): "https://rest.eu.zuora.com/",
+    (False, False, False): "https://www.zuora.com/",
+    (False, True,  False): "https://apisandbox.zuora.com/",
+    (False, False, True ): "https://rest.sandbox.eu.zuora.com/",
+    (False, True,  True ): "https://rest.eu.zuora.com/",
+    (True,  False, False): "https://rest.zuora.com/",
+    (True,  True,  False): "https://rest.apisandbox.zuora.com/",
+    (True,  False, True ): "https://rest.eu.zuora.com/",
+    (True,  True,  True ): "https://rest.sandbox.eu.zuora.com/",
 }
 
 LATEST_WSDL_VERSION = "87.0"
@@ -28,9 +32,8 @@ class Client:
         self.european = european
         self._session = requests.Session()
 
-    @property
-    def base_url(self):
-        return URLS[(self.sandbox, self.european)]
+    def get_url(self, url, rest=False):
+        return URLS[(rest, self.sandbox, self.european)] + url
 
     @property
     def aqua_auth(self):
@@ -46,7 +49,6 @@ class Client:
         }
 
     def _request(self, method, url, stream=False, **kwargs):
-        url = self.base_url + url
         req = requests.Request(method, url, **kwargs).prepare()
         LOGGER.info("%s: %s", method, req.url)
         resp = self._session.send(req, stream=stream)
@@ -56,7 +58,9 @@ class Client:
         return resp
 
     def aqua_request(self, method, url, **kwargs):
+        url = self.get_url(url, rest=False)
         return self._request(method, url, auth=self.aqua_auth, **kwargs)
 
     def rest_request(self, method, url, **kwargs):
+        url = self.get_url(url, rest=True)
         return self._request(method, url, headers=self.rest_headers, **kwargs)

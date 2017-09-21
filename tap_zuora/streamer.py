@@ -3,6 +3,7 @@ import datetime
 import io
 
 import dateutil
+import singer
 import singer.utils
 
 
@@ -10,6 +11,8 @@ PARTNER_ID = "salesforce"
 MAX_EXPORT_DAYS = 30
 MAX_EXPORT_POLLS = 60
 EXPORT_SLEEP_INTERVAL = 30
+
+LOGGER = singer.get_logger()
 
 
 def parse_line(line):
@@ -44,7 +47,9 @@ class AquaStreamer(Streamer):
     def gen_records(self):
         file_ids = self.state.get_file_ids(self.entity)
         if not file_ids:
-            job_id = self.post_job()
+            start_date = self.state.get_bookmark(self.entity)
+            query = self.entity.get_zoqlexport(start_date)
+            job_id = self.post_job(query)
             file_ids = self.poll_job(job_id)
             self.state.set_file_ids(self.entity, file_ids)
 
@@ -60,11 +65,8 @@ class AquaStreamer(Streamer):
 
             self.state.set_file_ids(self.entity, file_ids)
 
-    def post_job(self):
-        start_date = self.state.get_bookmark(self.entity)
-        query = self.entity.get_zoqlexport(start_date)
+    def post_job(self, query):
         project = "{}_{}".format(self.entity.name, self.state.get_version(self.entity))
-
         export_data = {
             "name": self.entity.name,
             "partner": PARTNER_ID,
@@ -72,7 +74,7 @@ class AquaStreamer(Streamer):
             "format": "csv",
             "version": "1.2",
             "encrypted": "none",
-            "useQueryLabels": "false",
+            "useQueryLabels": "true",
             "dateTimeUtc": "true",
             "queries": [
                 {
@@ -87,15 +89,20 @@ class AquaStreamer(Streamer):
             ],
         }
 
-        if start_date:
+        if self.entity.replication_key:
             # incremental time has to be YYYY-mm-dd HH:MM:SS in Pacific time
             # so we need to parse the datestring, make it UTC, then convert
+            start_date = self.state.get_bookmark(self.entity)
             start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
             start_dt = start_dt.replace(tzinfo=dateutil.tz.gettz("UTC"))
             incremental_dt = start_dt.astimezone(dateutil.tz.gettz("America/Los_Angeles"))
             export_data["incrementalTime"] =  incremental_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        return self.client.aqua_request("POST", "apps/api/batch-query/", json=export_data).json()['id']
+        resp = self.client.aqua_request("POST", "apps/api/batch-query/", json=export_data).json()
+        if "message" in resp:
+            raise SyntaxError(resp["message"])
+
+        return resp['id']
 
     def poll_job(self, job_id):
         poll = 0

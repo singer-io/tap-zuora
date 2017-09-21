@@ -1,8 +1,12 @@
+from collections import namedtuple
+
 from xml.etree import ElementTree
 
 import singer
 from singer import catalog
 
+from tap_zuora.entity import Entity
+from tap_zuora.state import State
 from tap_zuora.streamer import RestStreamer
 
 LOGGER = singer.get_logger()
@@ -35,16 +39,20 @@ CAN_BE_NULL_FIELD_PATHS = set([
     "RatePlanCharge.UOM",
 ])
 
+SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
 
 FieldInfo = namedtuple('FieldInfo', ['name', 'type', 'required', 'contexts'])
 
 
 def entity_available(client, entity_name):
-    streamer = RestStreamer(None, client, None)
-    query = "select Id from {}".format(entity_name)
-
-    # TODO: should blow up here somehow
-    job_id = streamer.post_job(query)
+    entity = Entity(entity_name)
+    state = State()
+    streamer = RestStreamer(entity, client, state)
+    query = "select * from {}".format(entity_name)
+    try:
+        streamer.post_job(query)
+    except SyntaxError as ex:
+        return False
 
     return True
 
