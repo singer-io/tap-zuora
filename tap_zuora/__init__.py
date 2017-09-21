@@ -22,7 +22,7 @@ REQUIRED_CONFIG_KEYS = [
 LOGGER = singer.get_logger()
 
 
-def do_discover(client):
+def do_discover(client, force_rest=False):
     LOGGER.info("Starting discover")
     catalog = discover_entities(client)
     catalog.dump()
@@ -87,12 +87,14 @@ def main(config, state_dict, properties=None, discover=False):
         euro=config.get("european", False),
     )
 
+    force_rest = config.get("force_rest", False)
+
     if discover:
-        do_discover(client)
+        do_discover(client, force_rest)
     elif properties:
         state = State(state_dict, config["start_date"])
         catalog = catalog.Catalog(annotated_schemas)
-        do_sync(client, state, catalog, config.get("force_rest", False))
+        do_sync(client, state, catalog, force_rest)
     else:
         raise Exception("Must have properties or run discovery")
 

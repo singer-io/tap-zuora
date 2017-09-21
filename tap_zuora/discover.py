@@ -3,6 +3,7 @@ from collections import namedtuple
 from xml.etree import ElementTree
 
 import singer
+from singer.schema import Schema
 from singer.catalog import (
     Catalog,
     CatalogEntry,
@@ -148,20 +149,20 @@ def get_replication_key(definition):
             return key
 
 
-def discover_entities(client):
+def discover_entities(client, force_rest=False):
     catalog = Catalog([])
 
     for name, deleted in discover_available_entities_and_deleted(client):
         definition = discover_entity_definition(client, name)
         schema = convert_definition_to_schema(name, definition)
-        if deleted:
+        if deleted and not force_rest:
             schema["properties"]["Deleted"] = {"type": "boolean"}
 
         catalog_entry = CatalogEntry(
             tap_stream_id=name,
             stream=name,
             key_properties=["Id"],
-            schema=schema,
+            schema=Schema.from_dict(schema),
             replication_key=get_replication_key(definition),
         )
 

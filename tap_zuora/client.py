@@ -2,16 +2,22 @@ import requests
 
 import singer
 
-# The keys are hashes of (rest, sandbox, european) booleans
+IS_AQUA = False
+IS_REST = True
+IS_PROD = False
+IS_SAND = True
+NOT_EURO = False
+IS_EURO = True
+
 URLS = {
-    (False, False, False): "https://www.zuora.com/",
-    (False, True,  False): "https://apisandbox.zuora.com/",
-    (False, False, True ): "https://rest.sandbox.eu.zuora.com/",
-    (False, True,  True ): "https://rest.eu.zuora.com/",
-    (True,  False, False): "https://rest.zuora.com/",
-    (True,  True,  False): "https://rest.apisandbox.zuora.com/",
-    (True,  False, True ): "https://rest.eu.zuora.com/",
-    (True,  True,  True ): "https://rest.sandbox.eu.zuora.com/",
+    (IS_AQUA, IS_PROD, NOT_EURO): "https://www.zuora.com/",
+    (IS_AQUA, IS_SAND, NOT_EURO): "https://apisandbox.zuora.com/",
+    (IS_AQUA, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
+    (IS_AQUA, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
+    (IS_REST, IS_PROD, NOT_EURO): "https://rest.zuora.com/",
+    (IS_REST, IS_SAND, NOT_EURO): "https://rest.apisandbox.zuora.com/",
+    (IS_REST, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
+    (IS_REST, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
 }
 
 LATEST_WSDL_VERSION = "87.0"

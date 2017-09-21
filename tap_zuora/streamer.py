@@ -172,12 +172,12 @@ class RestStreamer(Streamer):
             "Format": "csv",
             "Query": query,
         }
-        return self.client.rest_request("POST", "object/export", json=export_query).json()["Id"]
+        return self.client.rest_request("POST", "v1/object/export", json=export_query).json()["Id"]
 
     def poll_job(self, job_id):
         poll = 0
         while poll < MAX_EXPORT_POLLS:
-            resp = self.client.rest_headers("GET", "object/export/{}".format(job_id)).json()
+            resp = self.client.rest_headers("GET", "v1/object/export/{}".format(job_id)).json()
             if resp["Status"] == "Completed":
                 return resp["FileId"]
             elif resp["Status"] == "Failed":
@@ -189,4 +189,4 @@ class RestStreamer(Streamer):
         raise ExportFailed("Timed out")
 
     def get_file(self, file_id):
-        return self.client.rest_request("GET", "files/{}".format(file_id), stream=True)
+        return self.client.rest_request("GET", "v1/files/{}".format(file_id), stream=True)
