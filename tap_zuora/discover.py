@@ -3,11 +3,14 @@ from collections import namedtuple
 from xml.etree import ElementTree
 
 import singer
-from singer import catalog
+from singer.catalog import (
+    Catalog,
+    CatalogEntry,
+)
 
 from tap_zuora.entity import Entity
 from tap_zuora.state import State
-from tap_zuora.streamer import RestStreamer
+from tap_zuora.streamer import get_export_payload
 
 LOGGER = singer.get_logger()
 
@@ -40,21 +43,27 @@ CAN_BE_NULL_FIELD_PATHS = set([
 ])
 
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
-
+NO_DELETED_SUPPORT = ("Objects included in the queries do not support the querying of deleted "
+                      "records. Remove Deleted section in the JSON request and retry the request")
 FieldInfo = namedtuple('FieldInfo', ['name', 'type', 'required', 'contexts'])
 
 
-def entity_available(client, entity_name):
-    entity = Entity(entity_name)
-    state = State()
-    streamer = RestStreamer(entity, client, state)
-    query = "select * from {}".format(entity_name)
-    try:
-        streamer.post_job(query)
-    except SyntaxError as ex:
-        return False
+def entity_available_and_deleted(client, entity_name):
+    query = "select * from {} limit 1".format(entity_name)
+    export_payload = get_export_payload(entity_name, "discover", query)
+    resp = client.aqua_request("POST", "apps/api/batch-query/", json=export_payload).json()
+    if "message" in resp:
+        if resp["message"] == SYNTAX_ERROR:
+            LOGGER.info("%s not available", entity_name)
+            return False, False
+        elif resp["message"] == NO_DELETED_SUPPORT:
+            LOGGER.info("%s available, does not support deleted entries", entity_name)
+            return True, False
+        else:
+            raise Exception("Something went wrong testing {}: {}".format(entity_name, resp["message"]))
 
-    return True
+    LOGGER.info("%s available", entity_name)
+    return True, True
 
 
 def get_entity_names(client):
@@ -63,13 +72,22 @@ def get_entity_names(client):
     return [t.text for t in etree.findall('./object/name')]
 
 
-def discover_available_entities(client):
-    return [e for e in get_entity_names(client) if entity_available(client, e)]
+def discover_available_entities_and_deleted(client):
+    available_entities = []
+
+    entity_names = get_entity_names(client)
+    for entity_name in entity_names:
+        available, deleted = entity_available_and_deleted(client, entity_name)
+        if available:
+            available_entities.append((entity_name, deleted))
+
+    return available_entities
 
 
 def parse_field_element(field_element):
+    name = field_element.find('name').text
     return FieldInfo(
-        name=field_element.find('name').text,
+        name=name,
         type=TYPE_MAP.get(field_element.find('type').text, None),
         required=name in REQUIRED_KEYS or field_element.find('required').text.lower() == "true",
         contexts=[t.text for t in field_element.find('contexts').getchildren()],
@@ -77,7 +95,7 @@ def parse_field_element(field_element):
 
 
 def discover_entity_definition(client, entity_name):
-    xml_str = client.rest_request("GET", "describe/{}".format(entity_name)).content
+    xml_str = client.rest_request("GET", "v1/describe/{}".format(entity_name)).content
     etree = ElementTree.fromstring(xml_str)
 
     field_dict = {}
@@ -99,7 +117,7 @@ def discover_entity_definition(client, entity_name):
 def convert_definition_to_schema(entity_name, definition):
     properties = {}
     for name, props in definition.items():
-        field_properties["selected"] = True
+        field_properties = {"selected": True}
 
         if props["type"] in ["date", "datetime"]:
             field_properties["type"] = "string"
@@ -131,16 +149,19 @@ def get_replication_key(definition):
 
 
 def discover_entities(client):
-    catalog = Catalog()
+    catalog = Catalog([])
 
-    for name in discover_available_entities(client):
+    for name, deleted in discover_available_entities_and_deleted(client):
         definition = discover_entity_definition(client, name)
+        schema = convert_definition_to_schema(name, definition)
+        if deleted:
+            schema["properties"]["Deleted"] = {"type": "boolean"}
 
         catalog_entry = CatalogEntry(
             tap_stream_id=name,
             stream=name,
             key_properties=["Id"],
-            schema=convert_definition_to_schema(name, definition),
+            schema=schema,
             replication_key=get_replication_key(definition),
         )
 

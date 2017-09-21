@@ -15,6 +15,10 @@ EXPORT_SLEEP_INTERVAL = 30
 LOGGER = singer.get_logger()
 
 
+class ExportException(Exception):
+    pass
+
+
 def parse_line(line):
     reader = csv.reader(io.StringIO(line.decode('utf-8')))
     return next(reader)
@@ -27,6 +31,31 @@ def convert_header(header):
 
 def parse_header_line(line):
     return [convert_header(h) for h in parse_line(line)]
+
+
+def get_export_payload(entity_name, version, query):
+    project = "{}_{}".format(entity_name, version)
+    return {
+        "name": entity_name,
+        "partner": PARTNER_ID,
+        "project": project,
+        "format": "csv",
+        "version": "1.2",
+        "encrypted": "none",
+        "useQueryLabels": "true",
+        "dateTimeUtc": "true",
+        "queries": [
+            {
+                "name": project,
+                "query": query,
+                "type": "zoqlexport",
+                "deleted": {
+                    "column": "Deleted",
+                    "format": "Boolean",
+                },
+            },
+        ],
+    }
 
 
 class ExportFailed(Exception):
@@ -66,28 +95,8 @@ class AquaStreamer(Streamer):
             self.state.set_file_ids(self.entity, file_ids)
 
     def post_job(self, query):
-        project = "{}_{}".format(self.entity.name, self.state.get_version(self.entity))
-        export_data = {
-            "name": self.entity.name,
-            "partner": PARTNER_ID,
-            "project": project,
-            "format": "csv",
-            "version": "1.2",
-            "encrypted": "none",
-            "useQueryLabels": "true",
-            "dateTimeUtc": "true",
-            "queries": [
-                {
-                    "name": project,
-                    "query": query,
-                    "type": "zoqlexport",
-                    "deleted": {
-                        "column": "deleted",
-                        "format": "Boolean",
-                    },
-                },
-            ],
-        }
+        version = self.state.get_version(self.entity)
+        export_payload = get_export_payload(entity_name, version, query)
 
         if self.entity.replication_key:
             # incremental time has to be YYYY-mm-dd HH:MM:SS in Pacific time
@@ -96,11 +105,11 @@ class AquaStreamer(Streamer):
             start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
             start_dt = start_dt.replace(tzinfo=dateutil.tz.gettz("UTC"))
             incremental_dt = start_dt.astimezone(dateutil.tz.gettz("America/Los_Angeles"))
-            export_data["incrementalTime"] =  incremental_dt.strftime("%Y-%m-%d %H:%M:%S")
+            export_payload["incrementalTime"] =  incremental_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        resp = self.client.aqua_request("POST", "apps/api/batch-query/", json=export_data).json()
+        resp = self.client.aqua_request("POST", "apps/api/batch-query/", json=export_payload).json()
         if "message" in resp:
-            raise SyntaxError(resp["message"])
+            raise ExportException(resp["message"])
 
         return resp['id']
 
