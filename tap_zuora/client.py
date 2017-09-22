@@ -2,6 +2,7 @@ import requests
 
 import singer
 
+
 IS_AQUA = False
 IS_REST = True
 IS_PROD = False
