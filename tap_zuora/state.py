@@ -43,7 +43,8 @@ class State:
         if not entity.replication_key:
             raise Exception("Entities without replication keys do not support bookmarking")
 
-        self.get_entity_state(entity)[entity.replication_key] = bookmark
+        if bookmark > self.get_bookmark(entity):
+            self.get_entity_state(entity)[entity.replication_key] = bookmark
 
     def get_file_ids(self, entity):
         return self.get_entity_state(entity).get("file_ids", [])
