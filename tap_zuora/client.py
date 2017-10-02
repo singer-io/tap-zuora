@@ -27,8 +27,7 @@ LOGGER = singer.get_logger()
 
 
 class ApiException(Exception):
-    def __init__(self, resp):
-        super(ApiException, self).__init__("Bad API response {0.status_code}: {0.content}".format(resp))
+    pass
 
 
 class Client:
