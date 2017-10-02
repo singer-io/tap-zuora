@@ -20,17 +20,32 @@ REQUIRED_CONFIG_KEYS = [
 LOGGER = singer.get_logger()
 
 
+def convert_legacy_state(catalog, state):
+    new_state = {"bookmarks": {}, "current_stream": state.get("current_stream")}
+    for stream in catalog["streams"]:
+        if stream.get("selected") and stream.get("replication_key") and stream["tap_stream_id"] in state:
+            new_state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = state[stream["tap_stream_id"]]
+
+    return new_state
+
+
 def validate_state(config, catalog, state):
+    if "bookmarks" not in state:
+        if len(state.keys()):
+            LOGGER.info("Legacy state detected")
+            state = convert_legacy_state(catalog, state)
+        else:
+            LOGGER.info("No bookmarks found")
+            state["bookmarks"] = {}
+
     if "current_stream" not in state:
         LOGGER.info("Current stream not found")
         state["current_stream"] = None
 
-    if "bookmarks" not in state:
-        LOGGER.info("No current bookmarks found")
-        state["bookmarks"] = {}
-
     for stream in catalog["streams"]:
         if not stream.get("selected"):
+            if state["current_stream"] == stream["tap_stream_id"]:
+                state["current_stream"] = None
             continue
 
         if stream["tap_stream_id"] not in state["bookmarks"]:
@@ -96,9 +111,12 @@ def main(config, catalog, state, discover=False):
     if discover:
         do_discover(client, force_rest)
     elif catalog:
-        state = validate_state(config, catalog, state)
+        # singer-python's Catalog class doesn't provide much use to this tap, so we
+        # treat the catalog simply as a data structure.
         if isinstance(catalog, singer.catalog.Catalog):
             catalog = catalog.to_dict()
+
+        state = validate_state(config, catalog, state)
         do_sync(client, state, catalog, force_rest)
     else:
         raise Exception("Must have catalog if syncing")
