@@ -10,8 +10,9 @@ setup(name='tap-zuora',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_zuora'],
       install_requires=[
-          'singer-python==1.6.0',
+          'singer-python==3.5.3',
           'requests==2.12.4',
+          'pendulum==1.2.0',
       ],
       entry_points='''
           [console_scripts]
