@@ -5,7 +5,6 @@ import time
 import singer
 
 from tap_zuora.client import Client
-from tap_zuora.state import State
 from tap_zuora.discover import discover_streams
 from tap_zuora.sync import sync_stream
 
