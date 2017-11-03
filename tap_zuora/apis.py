@@ -108,7 +108,7 @@ class Aqua:
     @staticmethod
     def job_ready(client, job_id):
         endpoint = "apps/api/batch-query/jobs/{}".format(job_id)
-        data = client.aqua_request("GET", endpoint)).json()
+        data = client.aqua_request("GET", endpoint).json()
         if data["status"] == "completed":
             return True
         elif data["status"] == "failed":
@@ -120,7 +120,7 @@ class Aqua:
     @staticmethod
     def get_file_ids(client, job_id):
         endpoint = "apps/api/batch-query/jobs/{}".format(job_id)
-        data = client.aqua_request("GET", endpoint)).json()
+        data = client.aqua_request("GET", endpoint).json()
         if "segments" in data["batches"][0]:
             return data["batches"][0]["segments"]
         else:
