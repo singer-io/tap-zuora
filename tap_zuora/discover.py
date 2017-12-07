@@ -61,7 +61,8 @@ def get_field_dict(client, stream_name):
         if field_info["type"] is None:
             LOGGER.debug("%s.%s has an unsupported data type", stream_name, field_info["name"])
         elif "export" not in field_info["contexts"]:
-            LOGGER.debug("%s.%s not available", stream_name, field_info.name)
+            LOGGER.debug("%s.%s not available", stream_name, field_info["name"])
+            # show the field in the UI, but it needs to be 'unsupported'
 
         else:
             field_dict[field_info["name"]] = {

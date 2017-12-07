@@ -90,7 +90,7 @@ class Aqua:
 
     @staticmethod
     def stream_status(client, stream_name):
-        endpoint = "apps/api/batch-query"
+        endpoint = "apps/api/batch-query/"
         query = "select * from {} limit 1".format(stream_name)
         payload = Aqua.make_payload(stream_name, "discover", query)
         resp = client.aqua_request("POST", endpoint, json=payload).json()

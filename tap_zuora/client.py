@@ -40,6 +40,12 @@ class Client:
         self.european = european
         self._session = requests.Session()
 
+    @staticmethod
+    def from_config(config):
+        sandbox = config.get('sandbox', False)
+        european = config.get('european', False)
+        return Client(config['username'], config['password'], sandbox, european)
+
     def get_url(self, url, rest=False):
         return URLS[(rest, self.sandbox, self.european)] + url
 

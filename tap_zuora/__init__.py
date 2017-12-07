@@ -104,9 +104,11 @@ def do_sync(client, catalog, state, force_rest=False):
     LOGGER.info("Finished sync")
 
 
-def main(config, catalog, state, discover=False):
-    client = Client.from_config(config)
-    force_rest = config.get("force_rest", False)
+def main():
+    args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
+
+    client = Client.from_config(args.config)
+    force_rest = args.config.get("force_rest", False)
     if discover:
         do_discover(client, force_rest)
     elif catalog:
@@ -119,12 +121,3 @@ def main(config, catalog, state, discover=False):
         do_sync(client, state, catalog, force_rest)
     else:
         raise Exception("Must have catalog if syncing")
-
-if __name__ == "__main__":
-    args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
-
-    try:
-        main(args.config, args.properties, args.state, args.discover)
-    except Exception as e:
-        LOGGER.fatal(e)
-        raise e
