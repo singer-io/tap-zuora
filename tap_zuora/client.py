@@ -42,8 +42,8 @@ class Client:
 
     @staticmethod
     def from_config(config):
-        sandbox = config.get('sandbox', False)
-        european = config.get('european', False)
+        sandbox = config.get('sandbox', False) == 'true'
+        european = config.get('european', False) == 'true'
         return Client(config['username'], config['password'], sandbox, european)
 
     def get_url(self, url, rest=False):

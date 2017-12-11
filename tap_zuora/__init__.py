@@ -109,15 +109,13 @@ def main():
 
     client = Client.from_config(args.config)
     force_rest = args.config.get("force_rest", False)
-    if discover:
+    if args.discover:
         do_discover(client, force_rest)
-    elif catalog:
+    elif args.catalog:
         # singer-python's Catalog class doesn't provide much use to this tap, so we
         # treat the catalog simply as a data structure.
-        if isinstance(catalog, singer.catalog.Catalog):
-            catalog = catalog.to_dict()
+        if isinstance(args.catalog, singer.catalog.Catalog):
+            catalog = args.catalog.to_dict()
 
-        state = validate_state(config, catalog, state)
-        do_sync(client, state, catalog, force_rest)
-    else:
-        raise Exception("Must have catalog if syncing")
+        state = validate_state(args.config, args.catalog, args.state)
+        do_sync(client, args.state, args.catalog, force_rest)

@@ -62,10 +62,13 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
         header = parse_header_line(next(lines))
         for line in lines:
+            # what is headers?
             row = dict(zip(headers, parsed_line))
+            # this seems incomplete
             record = format_value(stream, row)
             if stream.get("replication_key"):
                 bookmark = record[stream["replication_key"]]
+                # are we comparing datetimes here? we should?
                 if bookmark < start_date:
                     continue
 
@@ -85,7 +88,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
     return counter
 
 
-def sync_aqua_stream(client, state, stream):
+def sync_aqua_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
     if not file_ids:
         job_id = apis.Aqua.create_job(client, state, stream)

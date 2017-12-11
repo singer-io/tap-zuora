@@ -133,11 +133,15 @@ def discover_stream(client, stream_name, force_rest):
             "additionalProperties": False,
             "properties": properties,
         },
+        'metadata': []
     }
 
     replication_key = get_replication_key(properties)
     if replication_key:
         stream["replication_key"] = replication_key
+        stream["replication_method"] = "INCREMENTAL"
+    else:
+        stream["replication_method"] = "FULL_TABLE"
 
     return stream
 
