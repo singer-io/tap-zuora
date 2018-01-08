@@ -4,6 +4,7 @@ import time
 
 import singer
 
+from singer import metadata
 from tap_zuora.client import Client
 from tap_zuora.discover import discover_streams
 from tap_zuora.sync import sync_stream
@@ -27,6 +28,8 @@ def convert_legacy_state(catalog, state):
 
     return new_state
 
+def stream_is_selected(mdata):
+    return mdata.get((), {}).get('selected', False)
 
 def validate_state(config, catalog, state):
     if "bookmarks" not in state:
@@ -41,23 +44,23 @@ def validate_state(config, catalog, state):
         LOGGER.info("Current stream not found")
         state["current_stream"] = None
 
-    for stream in catalog["streams"]:
-        if not stream.get("selected"):
-            if state["current_stream"] == stream["tap_stream_id"]:
+    for stream in catalog.streams:
+        if not stream_is_selected(metadata.to_map(stream.metadata)):
+            if state["current_stream"] == stream.tap_stream_id:
                 state["current_stream"] = None
             continue
 
-        if stream["tap_stream_id"] not in state["bookmarks"]:
-            LOGGER.info("Initializing state for %s", stream["tap_stream_id"])
+        if stream.tap_stream_id not in state["bookmarks"]:
+            LOGGER.info("Initializing state for %s", stream.tap_stream_id)
             version = int(time.time())
-            state["bookmarks"][stream["tap_stream_id"]] = {"version": version}
+            state["bookmarks"][stream.tap_stream_id] = {"version": version}
 
-        if not stream.get("replication_key"):
+        if not stream.replication_key:
             continue
 
-        if stream["replication_key"] not in state["bookmarks"][stream["tap_stream_id"]]:
-            LOGGER.info("Setting start date for %s to %s", stream["tap_stream_id"], config["start_date"])
-            state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = config["start_date"]
+        if stream.replication_key not in state["bookmarks"][stream.tap_stream_id]:
+            LOGGER.info("Setting start date for %s to %s", stream.tap_stream_id, config["start_date"])
+            state["bookmarks"][stream.tap_stream_id][stream.replication_key] = config["start_date"]
 
     return state
 
@@ -76,9 +79,9 @@ def do_sync(client, catalog, state, force_rest=False):
     else:
         LOGGER.info("Starting sync")
 
-    for stream in catalog["streams"]:
-        stream_name = stream["tap_stream_id"]
-        if not stream.get("selected"):
+    for stream in catalog.streams:
+        stream_name = stream.tap_stream_id
+        if not stream_is_selected(metadata.to_map(stream.metadata)):
             LOGGER.info("%s: Skipping - not selected", stream_name)
             continue
 
@@ -94,8 +97,8 @@ def do_sync(client, catalog, state, force_rest=False):
 
         state["current_stream"] = stream_name
         singer.write_state(state)
-        singer.write_schema(stream_name, stream["schema"], stream["key_properties"])
-        counter = sync_stream(client, state, stream, force_rest)
+        singer.write_schema(stream_name, stream.schema.to_dict(), stream.key_properties)
+        counter = sync_stream(client, state, stream.to_dict(), force_rest)
 
         LOGGER.info("%s: Completed sync (%s rows)", stream_name, counter.value)
 
@@ -112,10 +115,5 @@ def main():
     if args.discover:
         do_discover(client, force_rest)
     elif args.catalog:
-        # singer-python's Catalog class doesn't provide much use to this tap, so we
-        # treat the catalog simply as a data structure.
-        if isinstance(args.catalog, singer.catalog.Catalog):
-            catalog = args.catalog.to_dict()
-
         state = validate_state(args.config, args.catalog, args.state)
-        do_sync(client, args.state, args.catalog, force_rest)
+        do_sync(client, args.catalog, state, force_rest)

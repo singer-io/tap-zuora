@@ -62,10 +62,9 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
         header = parse_header_line(next(lines))
         for line in lines:
-            # what is headers?
-            row = dict(zip(headers, parsed_line))
+            row = dict(zip(header, parsed_line))
             # this seems incomplete
-            record = format_value(stream, row)
+            record = format_values(stream, row)
             if stream.get("replication_key"):
                 bookmark = record[stream["replication_key"]]
                 # are we comparing datetimes here? we should?
