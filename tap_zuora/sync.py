@@ -6,6 +6,7 @@ import pendulum
 import singer
 
 from singer import metadata
+from singer import transform
 from tap_zuora import apis
 
 
@@ -14,18 +15,6 @@ DEFAULT_POLL_INTERVAL = 60
 DEFAULT_JOB_TIMEOUT = 3600
 
 LOGGER = singer.get_logger()
-
-
-def format_value(value, schema):
-    return value
-
-
-def format_values(stream, row):
-    mdata = metadata.to_map(stream['metadata'])
-    return {field: format_value(row.get(field), stream["schema"])
-            for field, schema in stream["schema"]["properties"].items()
-            if metadata.get(mdata, ('properties', field), 'selected')
-            or metadata.get(mdata, ('properties', field), 'inclusion') == 'automatic'}
 
 
 def parse_csv_line(line):
@@ -66,8 +55,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
         for line in lines:
             parsed_line = parse_csv_line(line)
             row = dict(zip(header, parsed_line))
-            # this seems incomplete
-            record = format_values(stream, row)
+            record = transform(row, stream['schema'])
             if stream.get("replication_key"):
                 bookmark = record.get(stream["replication_key"])
                 # are we comparing datetimes here? we should?
