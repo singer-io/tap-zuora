@@ -1,6 +1,7 @@
 import singer
 from xml.etree import ElementTree
 
+from singer import metadata
 from tap_zuora import apis
 
 
@@ -89,6 +90,8 @@ def discover_stream(client, stream_name, force_rest):
     field_dict = get_field_dict(client, stream_name)
 
     properties = {}
+    mdata = metadata.new()
+
     for field_name, props in field_dict.items():
         field_properties = {}
 
@@ -103,9 +106,9 @@ def discover_stream(client, stream_name, force_rest):
             field_properties["type"] = [field_properties["type"], "null"]
 
         if field_name in REQUIRED_KEYS:
-            field_properties["inclusion"] = "automatic"
+            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
         else:
-            field_properties["inclusion"] = "available"
+            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
 
         properties[field_name] = field_properties
 
@@ -133,7 +136,7 @@ def discover_stream(client, stream_name, force_rest):
             "additionalProperties": False,
             "properties": properties,
         },
-        'metadata': []
+        'metadata': metadata.to_list(mdata)
     }
 
     replication_key = get_replication_key(properties)

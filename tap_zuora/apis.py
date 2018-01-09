@@ -1,4 +1,5 @@
 import pendulum
+from singer import metadata
 
 
 MAX_EXPORT_DAYS = 30
@@ -10,7 +11,10 @@ NO_DELETED_SUPPORT = ("Objects included in the queries do not support the queryi
 
 
 def selected_fields(stream):
-    return [f for f, s in stream["schema"]["properties"].items() if s.get("selected")]
+    mdata = metadata.to_map(stream['metadata'])
+    return [f for f, s in stream["schema"]["properties"].items()
+            if metadata.get(mdata, ('properties', f), 'selected')
+            or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
 
 
 def format_datetime_zoql(datetime_str):
@@ -64,14 +68,14 @@ class Aqua:
         stream_name = stream["tap_stream_id"]
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
         project = "{}_{}".format(stream_name, version)
-        query = get_query(state, stream)
+        query = Aqua.get_query(state, stream)
         deleted = "Deleted" in stream["schema"]["properties"]
         payload = Aqua.make_payload(stream_name, project, query, deleted)
 
         if stream.get("replication_key"):
             # Incremental time must be in Pacific time
             # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/e_Post_Query_with_Retrieval_Time#Request_Parameters
-            bookmark = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
+            start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
             inc_pen = pendulum.parse(start_date)
             inc_pen = inc_pen.astimezone(pendulum.timezone("America/Los_Angeles"))
             payload["incrementalTime"] = inc_pen.strftime(ZOQL_FORMAT)

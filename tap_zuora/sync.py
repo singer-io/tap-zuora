@@ -5,6 +5,7 @@ import time
 import pendulum
 import singer
 
+from singer import metadata
 from tap_zuora import apis
 
 
@@ -20,9 +21,11 @@ def format_value(value, schema):
 
 
 def format_values(stream, row):
-    return {field: format_value(row.get(field))
+    mdata = metadata.to_map(stream['metadata'])
+    return {field: format_value(row.get(field), stream["schema"])
             for field, schema in stream["schema"]["properties"].items()
-            if schema.get("selected")}
+            if metadata.get(mdata, ('properties', field), 'selected')
+            or metadata.get(mdata, ('properties', field), 'inclusion') == 'automatic'}
 
 
 def parse_csv_line(line):
@@ -59,14 +62,14 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
     while len(file_ids) > 0:
         file_id = file_ids.pop(0)
         lines = api.stream_file(client, file_id)
-
         header = parse_header_line(next(lines))
         for line in lines:
+            parsed_line = parse_csv_line(line)
             row = dict(zip(header, parsed_line))
             # this seems incomplete
             record = format_values(stream, row)
             if stream.get("replication_key"):
-                bookmark = record[stream["replication_key"]]
+                bookmark = record.get(stream["replication_key"])
                 # are we comparing datetimes here? we should?
                 if bookmark < start_date:
                     continue
