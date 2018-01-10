@@ -12,6 +12,7 @@ from tap_zuora.sync import sync_stream
 
 REQUIRED_CONFIG_KEYS = [
     "start_date",
+    "api_type",
     "username",
     "password",
 ]
@@ -111,7 +112,7 @@ def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     client = Client.from_config(args.config)
-    force_rest = args.config.get("force_rest", False)
+    force_rest = args.config.get("api_type") == "REST"
     if args.discover:
         do_discover(client, force_rest)
     elif args.catalog:
