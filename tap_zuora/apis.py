@@ -194,3 +194,19 @@ class Rest:
     def stream_file(client, file_id):
         endpoint = "v1/files/{}".format(file_id)
         return client.rest_request("GET", endpoint, stream=True).iter_lines()
+
+    @staticmethod
+    def stream_status(client, stream_name):
+        endpoint = "v1/object/export"
+        query = "select * from {} limit 1".format(stream_name)
+        payload = {
+            "Query": query,
+            "Format": "csv"
+        }
+        resp = client.rest_request("POST", endpoint, json=payload).json()
+
+        if resp["Success"]:
+            return "available"
+
+        # Should we raise an "Error probing" exception here?
+        return "unavailable"
