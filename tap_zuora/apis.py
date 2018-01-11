@@ -3,7 +3,6 @@ from singer import metadata
 
 
 MAX_EXPORT_DAYS = 30
-ZOQL_FORMAT = "%Y-%m-%d %H:%M:%S"
 PARTNER_ID = "salesforce"
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
 NO_DELETED_SUPPORT = ("Objects included in the queries do not support the querying of deleted "
@@ -17,8 +16,8 @@ def selected_fields(stream):
             or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
 
 
-def format_datetime_zoql(datetime_str):
-    return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(ZOQL_FORMAT)
+def format_datetime_zoql(datetime_str, date_format):
+    return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
 
 
 class ExportFailed(Exception):
@@ -26,6 +25,8 @@ class ExportFailed(Exception):
 
 
 class Aqua:
+    ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
     @staticmethod
     def make_payload(stream_name, project, query, deleted=False):
         rtn = {
@@ -57,7 +58,7 @@ class Aqua:
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
         if stream.get("replication_key"):
             bookmark = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
-            start_date = format_datetime_zoql(bookmark)
+            start_date = format_datetime_zoql(bookmark, Aqua.ZOQL_DATE_FORMAT)
             query += " where {} >= '{}'".format(stream["replication_key"], start_date)
             query += " order by {} asc".format(stream["replication_key"])
 
@@ -78,7 +79,7 @@ class Aqua:
             start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
             inc_pen = pendulum.parse(start_date)
             inc_pen = inc_pen.astimezone(pendulum.timezone("America/Los_Angeles"))
-            payload["incrementalTime"] = inc_pen.strftime(ZOQL_FORMAT)
+            payload["incrementalTime"] = inc_pen.strftime(Aqua.ZOQL_DATE_FORMAT)
 
         return payload
 
@@ -138,6 +139,8 @@ class Aqua:
 
 
 class Rest:
+    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
     @staticmethod
     def make_payload(query):
         return {
@@ -151,8 +154,8 @@ class Rest:
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
 
         if stream.get("replication_key") and start_date and end_date:
-            start_date = format_datetime_zoql(start_date)
-            end_date = format_datetime_zoql(end_date)
+            start_date = format_datetime_zoql(start_date, Rest.ZOQL_DATE_FORMAT)
+            end_date = format_datetime_zoql(end_date, Rest.ZOQL_DATE_FORMAT)
             query += " where {} >= '{}'".format(stream["replication_key"], start_date)
             query += " and {} < '{}'".format(stream["replication_key"], end_date)
 

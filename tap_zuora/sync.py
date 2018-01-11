@@ -13,6 +13,7 @@ from tap_zuora import apis
 PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
 DEFAULT_JOB_TIMEOUT = 3600
+MAX_EXPORT_DAYS = 30
 
 LOGGER = singer.get_logger()
 
