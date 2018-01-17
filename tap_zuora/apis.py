@@ -3,7 +3,6 @@ from singer import metadata
 
 
 MAX_EXPORT_DAYS = 30
-PARTNER_ID = "salesforce"
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
 NO_DELETED_SUPPORT = ("Objects included in the queries do not support the querying of deleted "
                       "records. Remove Deleted section in the JSON request and retry the request")
@@ -28,10 +27,10 @@ class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     @staticmethod
-    def make_payload(stream_name, project, query, deleted=False):
+    def make_payload(stream_name, project, query, partner_id, deleted=False):
         rtn = {
             "name": stream_name,
-            "partner": PARTNER_ID,
+            "partner": partner_id,
             "project": project,
             "format": "csv",
             "version": "1.2",
@@ -65,13 +64,13 @@ class Aqua:
         return query
 
     @staticmethod
-    def get_payload(state, stream):
+    def get_payload(state, stream, partner_id):
         stream_name = stream["tap_stream_id"]
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
         project = "{}_{}".format(stream_name, version)
         query = Aqua.get_query(state, stream)
         deleted = "Deleted" in stream["schema"]["properties"]
-        payload = Aqua.make_payload(stream_name, project, query, deleted)
+        payload = Aqua.make_payload(stream_name, project, query, partner_id, deleted)
 
         if stream.get("replication_key"):
             # Incremental time must be in Pacific time
@@ -86,7 +85,7 @@ class Aqua:
     @staticmethod
     def create_job(client, state, stream):
         endpoint = "apps/api/batch-query/"
-        payload = Aqua.get_payload(state, stream)
+        payload = Aqua.get_payload(state, stream, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
         if "message" in resp:
             raise ExportFailed(resp["message"])
@@ -97,7 +96,7 @@ class Aqua:
     def stream_status(client, stream_name):
         endpoint = "apps/api/batch-query/"
         query = "select * from {} limit 1".format(stream_name)
-        payload = Aqua.make_payload(stream_name, "discover", query)
+        payload = Aqua.make_payload(stream_name, "discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
         if "message" in resp:
             if resp["message"] == SYNTAX_ERROR:

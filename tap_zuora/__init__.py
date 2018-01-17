@@ -113,6 +113,13 @@ def main():
 
     client = Client.from_config(args.config)
     force_rest = args.config.get("api_type") == "REST"
+
+    # Using the AQuA API requires a Zuora Partner ID
+    if not force_rest:
+        partner_id = args.config.get("partner_id")
+        if not partner_id:
+            raise Exception("Config is missing required `partner_id` key when using the AQuA API")
+
     if args.discover:
         do_discover(client, force_rest)
     elif args.catalog:

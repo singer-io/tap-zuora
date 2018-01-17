@@ -33,18 +33,19 @@ class ApiException(Exception):
 
 
 class Client:
-    def __init__(self, username, password, sandbox=False, european=False):
+    def __init__(self, username, password, partner_id, sandbox=False, european=False):
         self.username = username
         self.password = password
         self.sandbox = sandbox
         self.european = european
+        self.partner_id = partner_id
         self._session = requests.Session()
 
     @staticmethod
     def from_config(config):
         sandbox = config.get('sandbox', False) == 'true'
         european = config.get('european', False) == 'true'
-        return Client(config['username'], config['password'], sandbox, european)
+        return Client(config['username'], config['password'], config['partner_id'], sandbox, european)
 
     def get_url(self, url, rest=False):
         return URLS[(rest, self.sandbox, self.european)] + url
