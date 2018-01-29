@@ -126,6 +126,7 @@ def discover_stream(client, stream_name, force_rest):
         return None
     elif status == "available_with_deleted":
         properties["Deleted"] = {"type": "boolean"}
+        mdata = metadata.write(mdata, ('properties', 'Deleted'), 'inclusion', 'available')
 
     stream = {
         "tap_stream_id": stream_name,
