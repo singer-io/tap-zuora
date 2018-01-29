@@ -1,4 +1,5 @@
 import pendulum
+import singer
 from singer import metadata
 
 
@@ -7,6 +8,7 @@ SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
 NO_DELETED_SUPPORT = ("Objects included in the queries do not support the querying of deleted "
                       "records. Remove Deleted section in the JSON request and retry the request")
 
+LOGGER = singer.get_logger()
 
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
@@ -61,6 +63,7 @@ class Aqua:
             query += " where {} >= '{}'".format(stream["replication_key"], start_date)
             query += " order by {} asc".format(stream["replication_key"])
 
+        LOGGER.info("Executing query: %s", query)
         return query
 
     @staticmethod
@@ -158,6 +161,7 @@ class Rest:
             query += " where {} >= '{}'".format(stream["replication_key"], start_date)
             query += " and {} < '{}'".format(stream["replication_key"], end_date)
 
+        LOGGER.info("Executing query: %s", query)
         return query
 
     @staticmethod
