@@ -12,14 +12,21 @@ LOGGER = singer.get_logger()
 
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
-    return [f for f, s in stream["schema"]["properties"].items()
+    fields = [f for f, s in stream["schema"]["properties"].items()
             if metadata.get(mdata, ('properties', f), 'selected')
             or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
+
+    # Remove Deleted from the query if its selected
+    fields.remove('Deleted')
+    return fields
 
 
 def format_datetime_zoql(datetime_str, date_format):
     return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
 
+def deleted_is_selected(stream):
+    mdata = metadata.to_map(stream['metadata'])
+    return "Deleted" in stream["schema"]["properties"] and metadata.get(mdata, ('properties', 'Deleted'), 'selected')
 
 class ExportFailed(Exception):
     pass
@@ -72,7 +79,7 @@ class Aqua:
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
         project = "{}_{}".format(stream_name, version)
         query = Aqua.get_query(state, stream)
-        deleted = "Deleted" in stream["schema"]["properties"]
+        deleted = deleted_is_selected(stream)
         payload = Aqua.make_payload(stream_name, project, query, partner_id, deleted)
 
         if stream.get("replication_key"):
