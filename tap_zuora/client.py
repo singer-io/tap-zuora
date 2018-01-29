@@ -45,7 +45,8 @@ class Client:
     def from_config(config):
         sandbox = config.get('sandbox', False) == 'true'
         european = config.get('european', False) == 'true'
-        return Client(config['username'], config['password'], config['partner_id'], sandbox, european)
+        partner_id = config.get('partner_id', None)
+        return Client(config['username'], config['password'], partner_id, sandbox, european)
 
     def get_url(self, url, rest=False):
         return URLS[(rest, self.sandbox, self.european)] + url
