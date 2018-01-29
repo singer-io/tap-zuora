@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+  * Fixes a bug with accesing partner_id as the Client is being created [#4](https://github.com/singer-io/tap-zuora/pull/4)
+  * Output the Zuora query to the log for visibility [#5](https://github.com/singer-io/tap-zuora/pull/5)
+  * Adds Singer metadata to the Deleted field added for Zuora objects that support it [#6](https://github.com/singer-io/tap-zuora/pull/6)
+
 ## 0.1.0
   * Large rework of the Zuora Tap [#3](https://github.com/singer-io/tap-zuora/pull/3)
     * Rework the tap to support both the AQuA and REST API's.
