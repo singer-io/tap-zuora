@@ -24,9 +24,6 @@ def selected_fields(stream):
 def format_datetime_zoql(datetime_str, date_format):
     return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
 
-def deleted_is_selected(stream):
-    mdata = metadata.to_map(stream['metadata'])
-    return "Deleted" in stream["schema"]["properties"] and metadata.get(mdata, ('properties', 'Deleted'), 'selected')
 
 class ExportFailed(Exception):
     pass
@@ -34,6 +31,10 @@ class ExportFailed(Exception):
 
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+    # Zuora's documentation describes some objects which are not supported for deleted: https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
+    # Note: After testing, the list above is not 100% accurate.
+    DOES_NOT_SUPPORT_DELETED = ['AccountingPeriod', 'PaymentTransactionLog', 'RefundTransactionLog']
 
     @staticmethod
     def make_payload(stream_name, project, query, partner_id, deleted=False):
@@ -61,6 +62,15 @@ class Aqua:
         return rtn
 
     @staticmethod
+    def deleted_records_available(stream):
+        if stream['tap_stream_id'] in Aqua.DOES_NOT_SUPPORT_DELETED:
+            LOGGER.info("Deleted fields are not supported for stream - %s. Not selecting deleted records.", stream['tap_stream_id'])
+            return False
+
+        mdata = metadata.to_map(stream['metadata'])
+        return "Deleted" in stream["schema"]["properties"] and metadata.get(mdata, ('properties', 'Deleted'), 'selected')
+
+    @staticmethod
     def get_query(state, stream):
         fields = ", ".join(selected_fields(stream))
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
@@ -79,7 +89,7 @@ class Aqua:
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
         project = "{}_{}".format(stream_name, version)
         query = Aqua.get_query(state, stream)
-        deleted = deleted_is_selected(stream)
+        deleted = Aqua.deleted_records_available(stream)
         payload = Aqua.make_payload(stream_name, project, query, partner_id, deleted)
 
         if stream.get("replication_key"):
