@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+  * Adds and fixes some pylint [#9](https://github.com/singer-io/tap-zuora/pull/9)
+  * Prevents errors when certain restricted objects attempt to query for deleted records [#8](https://github.com/singer-io/tap-zuora/pull/8)
+
 ## 0.1.2
   * Fixes a bug with AQuA queries being created incorrectly when deleted objects are desired [#7](https://github.com/singer-io/tap-zuora/pull/7)
 
