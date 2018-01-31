@@ -107,7 +107,7 @@ def do_sync(client, catalog, state, force_rest=False):
     singer.write_state(state)
     LOGGER.info("Finished sync")
 
-
+@singer.utils.handle_top_exception(LOGGER)
 def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
