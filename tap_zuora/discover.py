@@ -1,5 +1,6 @@
-import singer
 from xml.etree import ElementTree
+import singer
+
 
 from singer import metadata
 from tap_zuora import apis
@@ -39,12 +40,12 @@ LOGGER = singer.get_logger()
 
 def parse_field_element(field_element):
     name = field_element.find("name").text
-    type = TYPE_MAP.get(field_element.find("type").text, None)
+    field_type = TYPE_MAP.get(field_element.find("type").text, None)
     required = field_element.find("required").text.lower() == "true" or name in REQUIRED_KEYS
     contexts = [t.text for t in field_element.find("contexts").getchildren()]
     return {
         "name": name,
-        "type": type,
+        "type": field_type,
         "required": required,
         "contexts": contexts,
     }
@@ -78,7 +79,7 @@ def get_replication_key(properties):
     for key in REPLICATION_KEYS:
         if key in properties:
             return key
-
+    return None
 
 def discover_stream_names(client):
     xml_str = client.rest_request("GET", "v1/describe").content

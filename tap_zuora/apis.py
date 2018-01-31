@@ -13,8 +13,8 @@ LOGGER = singer.get_logger()
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
     fields = [f for f, s in stream["schema"]["properties"].items()
-            if metadata.get(mdata, ('properties', f), 'selected')
-            or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
+              if metadata.get(mdata, ('properties', f), 'selected')
+              or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
 
     # Remove Deleted from the query if its selected
     fields.remove('Deleted')
@@ -147,8 +147,7 @@ class Aqua:
         data = client.aqua_request("GET", endpoint).json()
         if "segments" in data["batches"][0]:
             return data["batches"][0]["segments"]
-        else:
-            return [data["batches"][0]["fileId"]]
+        return [data["batches"][0]["fileId"]]
 
     # Must match call signature of other APIs
     @staticmethod
