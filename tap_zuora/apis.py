@@ -32,8 +32,9 @@ class ExportFailed(Exception):
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-    # Zuora's documentation describes some objects which are not supported for deleted: https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
-    # Note: After testing, the list above is not 100% accurate.
+    # Zuora's documentation describes some objects which are not supported for deleted
+    # See https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
+    # and https://github.com/singer-io/tap-zuora/pull/8 for more info.
     DOES_NOT_SUPPORT_DELETED = ['AccountingPeriod', 'PaymentTransactionLog', 'RefundTransactionLog']
 
     @staticmethod
