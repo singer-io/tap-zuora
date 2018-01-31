@@ -5,7 +5,6 @@ import time
 import pendulum
 import singer
 
-from singer import metadata
 from singer import transform
 from tap_zuora import apis
 
@@ -49,7 +48,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
     else:
         start_date = None
 
-    while len(file_ids) > 0:
+    while file_ids:
         file_id = file_ids.pop(0)
         lines = api.stream_file(client, file_id)
         header = parse_header_line(next(lines))
