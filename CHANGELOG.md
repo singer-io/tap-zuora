@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.4
+  * Fixes bugs when trying to select deleted records from objects that do not support it and skips empty lines [#10](https://github.com/singer-io/tap-zuora/pull/10)
+
 ## 0.1.3
   * Adds and fixes some pylint [#9](https://github.com/singer-io/tap-zuora/pull/9)
   * Prevents errors when certain restricted objects attempt to query for deleted records [#8](https://github.com/singer-io/tap-zuora/pull/8)
