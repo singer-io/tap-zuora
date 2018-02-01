@@ -35,7 +35,20 @@ class Aqua:
     # Zuora's documentation describes some objects which are not supported for deleted
     # See https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
     # and https://github.com/singer-io/tap-zuora/pull/8 for more info.
-    DOES_NOT_SUPPORT_DELETED = ['AccountingPeriod', 'PaymentTransactionLog', 'RefundTransactionLog']
+    DOES_NOT_SUPPORT_DELETED = [
+        'AccountingPeriod',
+        'ContactSnapshot',
+        'DiscountAppliedMetrics',
+        'PaymentGatewayReconciliationEventLog',
+        'PaymentTransactionLog',
+        'PaymentMethodTransactionLog',
+        'PaymentReconciliationJob',
+        'PaymentReconciliationLog',
+        'ProcessedUsage',
+        'RefundTransactionLog',
+        'UpdaterBatch',
+        'UpdaterDetail'
+    ]
 
     @staticmethod
     def make_payload(stream_name, project, query, partner_id, deleted=False):
