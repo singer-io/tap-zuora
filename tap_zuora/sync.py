@@ -53,6 +53,9 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
         lines = api.stream_file(client, file_id)
         header = parse_header_line(next(lines))
         for line in lines:
+            if not line:
+                continue
+
             parsed_line = parse_csv_line(line)
             row = dict(zip(header, parsed_line))
             record = transform(row, stream['schema'])
