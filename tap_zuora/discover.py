@@ -89,7 +89,10 @@ def discover_stream_names(client):
 
 
 def discover_stream(client, stream_name, force_rest):
-    field_dict = get_field_dict(client, stream_name)
+    try:
+        field_dict = get_field_dict(client, stream_name)
+    except ApiException as e:
+        return None
 
     properties = {}
     mdata = metadata.new()
@@ -157,12 +160,11 @@ def discover_streams(client, force_rest):
     failed_streams = []
 
     for stream_name in discover_stream_names(client):
-        try:
-            stream = discover_stream(client, stream_name, force_rest)
-        except ApiException as e:
-            failed_streams.append(stream_name)
+        stream = discover_stream(client, stream_name, force_rest)
         if stream:
             streams.append(stream)
+        else:
+            failed_streams.append(stream_name)
 
-    LOGGER.info('Failed to discover following streams: {}'.format(failed_streams));
+    LOGGER.info('Failed to discover following streams: {}'.format(failed_streams))
     return streams
