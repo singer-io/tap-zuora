@@ -157,14 +157,13 @@ def discover_stream(client, stream_name, force_rest):
 
 def discover_streams(client, force_rest):
     streams = []
-    failed_streams = []
-
+    failed_stream_names = []
     for stream_name in discover_stream_names(client):
         stream = discover_stream(client, stream_name, force_rest)
         if stream:
             streams.append(stream)
         else:
-            failed_streams.append(stream_name)
+            failed_stream_names.append(stream_name)
 
-    LOGGER.info('Failed to discover following streams: {}'.format(failed_streams))
+    LOGGER.info('Failed to discover following streams: {}'.format(failed_stream_names))
     return streams
