@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5
+  * Fixes issue where non-discoverable stream threw an exception that caused the tap to crash [#11](https://github.com/singer-io/tap-zuora/pull/11)
+
 ## 0.1.4
   * Fixes bugs when trying to select deleted records from objects that do not support it and skips empty lines [#10](https://github.com/singer-io/tap-zuora/pull/10)
 
