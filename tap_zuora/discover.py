@@ -4,6 +4,7 @@ import singer
 
 from singer import metadata
 from tap_zuora import apis
+from tap_zuora.client import ApiException
 
 
 TYPE_MAP = {
@@ -153,9 +154,15 @@ def discover_stream(client, stream_name, force_rest):
 
 def discover_streams(client, force_rest):
     streams = []
+    failed_streams = []
+
     for stream_name in discover_stream_names(client):
-        stream = discover_stream(client, stream_name, force_rest)
+        try:
+            stream = discover_stream(client, stream_name, force_rest)
+        except ApiException as e:
+            failed_streams.append(stream_name)
         if stream:
             streams.append(stream)
 
+    LOGGER.info('Failed to discover following streams: {}'.format(failed_streams));
     return streams
