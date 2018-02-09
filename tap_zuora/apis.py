@@ -17,7 +17,8 @@ def selected_fields(stream):
               or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
 
     # Remove Deleted from the query if its selected
-    fields.remove('Deleted')
+    if 'Deleted' in fields:
+        fields.remove('Deleted')
     return fields
 
 

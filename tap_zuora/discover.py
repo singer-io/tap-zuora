@@ -165,5 +165,6 @@ def discover_streams(client, force_rest):
         else:
             failed_stream_names.append(stream_name)
 
-    LOGGER.info('Failed to discover following streams: {}'.format(failed_stream_names))
+    if failed_stream_names:
+        LOGGER.info('Failed to discover following streams: {}'.format(failed_stream_names))
     return streams
