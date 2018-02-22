@@ -60,18 +60,20 @@ def get_field_dict(client, stream_name):
     field_dict = {}
     for field_element in etree.find("fields").getchildren():
         field_info = parse_field_element(field_element)
+        supported = True
 
         if field_info["type"] is None:
-            LOGGER.debug("%s.%s has an unsupported data type", stream_name, field_info["name"])
+            LOGGER.info("%s.%s has an unsupported data type", stream_name, field_info["name"])
+            supported = False
         elif "export" not in field_info["contexts"]:
-            LOGGER.debug("%s.%s not available", stream_name, field_info["name"])
-            # show the field in the UI, but it needs to be 'unsupported'
+            LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
+            supported = False
 
-        else:
-            field_dict[field_info["name"]] = {
-                "type": field_info["type"],
-                "required": field_info["required"],
-            }
+        field_dict[field_info["name"]] = {
+            "type": field_info["type"],
+            "required": field_info["required"],
+            "supported": supported
+        }
 
     return field_dict
 
@@ -112,8 +114,10 @@ def discover_stream(client, stream_name, force_rest):
 
         if field_name in REQUIRED_KEYS:
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
-        else:
+        elif props["supported"]:
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
+        else:
+            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'unsupported')
 
         properties[field_name] = field_properties
 
