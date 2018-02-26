@@ -66,13 +66,21 @@ def get_field_dict(client, stream_name):
             LOGGER.info("%s.%s has an unsupported data type", stream_name, field_info["name"])
             supported = False
         elif "export" not in field_info["contexts"]:
-            LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
-            supported = False
+           LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
+           continue
 
         field_dict[field_info["name"]] = {
             "type": field_info["type"],
             "required": field_info["required"],
             "supported": supported
+        }
+
+    for related_object in etree.find("related-objects").getchildren():
+        related_object_name = related_object.find("name").text + ".Id"
+        field_dict[related_object_name] = {
+            "type": "string",
+            "required": False,
+            "supported": True
         }
 
     return field_dict
