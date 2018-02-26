@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+  * Feature to use an object's `related-objects` data to add foreign keys to Zuora "Joined Objects" [#12](https://github.com/singer-io/tap-zuora/pull/12)
+  * Bumps the version of singer-python to better support 2 digit date formatting [#13](https://github.com/singer-io/tap-zuora/pull/13)
+  * Bumps the default timeout for Zuora Jobs from 60 minutes to 90 [#14](https://github.com/singer-io/tap-zuora/pull/14)
+
 ## 0.1.5
   * Fixes issue where non-discoverable stream threw an exception that caused the tap to crash [#11](https://github.com/singer-io/tap-zuora/pull/11)
 
