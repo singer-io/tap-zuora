@@ -22,13 +22,16 @@ def parse_csv_line(line):
     return next(reader)
 
 
-def convert_header(header):
-    _, header = header.split(".", 1)
-    return header
+def convert_header(header, stream):
+    dotted_field = header.split(".")
+    if stream == dotted_field[0]:
+        return dotted_field[1]
+
+    return header.replace(".", "")
 
 
-def parse_header_line(line):
-    return [convert_header(h) for h in parse_csv_line(line)]
+def parse_header_line(line, stream):
+    return [convert_header(h, stream) for h in parse_csv_line(line)]
 
 
 def poll_job_until_done(job_id, client, api):
@@ -51,7 +54,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
     while file_ids:
         file_id = file_ids.pop(0)
         lines = api.stream_file(client, file_id)
-        header = parse_header_line(next(lines))
+        header = parse_header_line(next(lines), stream["tap_stream_id"])
         for line in lines:
             if not line:
                 continue
