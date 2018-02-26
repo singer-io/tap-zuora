@@ -76,7 +76,7 @@ def get_field_dict(client, stream_name):
         }
 
     for related_object in etree.find("related-objects").getchildren():
-        related_object_name = related_object.find("name").text + ".Id"
+        related_object_name = related_object.find("name").text + "Id"
         field_dict[related_object_name] = {
             "type": "string",
             "required": False,
