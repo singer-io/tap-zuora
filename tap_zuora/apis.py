@@ -21,6 +21,16 @@ def selected_fields(stream):
         fields.remove('Deleted')
     return fields
 
+def joined_fields(fields, stream):
+    mdata = metadata.to_map(stream['metadata'])
+    joined_fields = []
+    for field_name in fields:
+        joined_obj = metadata.get(mdata, ('properties', field_name), 'tap-zuora.joined_object')
+        if joined_obj:
+            joined_fields.append(joined_obj + '.' + field_name.replace(joined_obj, ""))
+        else:
+            joined_fields.append(field_name)
+    return joined_fields
 
 def format_datetime_zoql(datetime_str, date_format):
     return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
@@ -87,7 +97,9 @@ class Aqua:
 
     @staticmethod
     def get_query(state, stream):
-        fields = ", ".join(selected_fields(stream))
+        selected_field_names = selected_fields(stream)
+        dotted_field_names = joined_fields(selected_field_names, stream)
+        fields = ", ".join(dotted_field_names)
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
         if stream.get("replication_key"):
             bookmark = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]

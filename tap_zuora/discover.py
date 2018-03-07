@@ -76,11 +76,12 @@ def get_field_dict(client, stream_name):
         }
 
     for related_object in etree.find("related-objects").getchildren():
-        related_object_name = related_object.find("name").text + "Id"
+        related_object_name = related_object.find("name").text + ".Id"
         field_dict[related_object_name] = {
             "type": "string",
             "required": False,
-            "supported": True
+            "supported": True,
+            "joined": True
         }
 
     return field_dict
@@ -109,6 +110,11 @@ def discover_stream(client, stream_name, force_rest):
 
     for field_name, props in field_dict.items():
         field_properties = {}
+
+        if props.get("joined", False):
+            split_field_name = field_name.split(".")
+            field_name = field_name.replace(".","")
+            mdata=metadata.write(mdata, ('properties', field_name), 'tap-zuora.joined_object', split_field_name[0])
 
         if props["type"] in ["date", "datetime"]:
             field_properties["type"] = "string"
