@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.1
+ * Fixes 'related-objects' to use metadata so tap knows which fields need to have a '.' added during the query
+
 ## 0.2.0
   * Feature to use an object's `related-objects` data to add foreign keys to Zuora "Joined Objects" [#12](https://github.com/singer-io/tap-zuora/pull/12)
   * Bumps the version of singer-python to better support 2 digit date formatting [#13](https://github.com/singer-io/tap-zuora/pull/13)
