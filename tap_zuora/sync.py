@@ -64,8 +64,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
             record = transform(row, stream['schema'])
             if stream.get("replication_key"):
                 bookmark = record.get(stream["replication_key"])
-                # are we comparing datetimes here? we should?
-                if bookmark < start_date:
+                if bookmark and bookmark < start_date:
                     continue
 
                 singer.write_record(stream["tap_stream_id"], record)
