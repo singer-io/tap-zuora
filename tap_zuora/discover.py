@@ -25,16 +25,6 @@ REPLICATION_KEYS = [
 
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
-CAN_BE_NULL_FIELD_PATHS = set([
-    "Export.Size",
-    "Import.TotalCount",
-    "Import.ResultResourceUrl",
-    "InvoiceItem.UOM",
-    "Payment.GatewayResponse",
-    "Payment.GatewayResponseCode",
-    "RatePlanCharge.UOM",
-])
-
 
 LOGGER = singer.get_logger()
 
@@ -123,7 +113,8 @@ def discover_stream(client, stream_name, force_rest):
             field_properties["type"] = props["type"]
 
         path = "{}.{}".format(stream_name, field_name)
-        if not props["required"] or path in CAN_BE_NULL_FIELD_PATHS:
+
+        if props["supported"]:
             field_properties["type"] = [field_properties["type"], "null"]
 
         if field_name in REQUIRED_KEYS:
