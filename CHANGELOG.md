@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.2
+  * Changes the discovery behavior to all any field to have a null value - not just "required" fields [#17](https://github.com/singer-io/tap-zuora/pull/17)
+
 ## 0.2.1
  * Fixes 'related-objects' to use metadata so tap knows which fields need to have a '.' added during the query
 
