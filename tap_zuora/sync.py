@@ -146,11 +146,12 @@ def sync_stream(client, state, stream, force_rest=False):
             else:
                 counter = sync_aqua_stream(client, state, stream, counter)
         except apis.ExportTimedOut as ex:
-            # TODO: Resume in progress job if we can
-            # TODO: We might need to check some information in the poll response to help
-            # the API for jobs returns "status: executing" or "status: completed" on the response
-            # Likely a failed option as well. Check the batch-query/jobs docs
-            LOGGER.info("Export failed: {}, writing state before exiting...".format(ex))
+            LOGGER.info("Export timed out, writing state before exiting...".format(ex))
+            singer.write_state(state)
+            raise
+        except apis.ExportFailed as ex:
+            # Ensure that we don't cache a failing job
+            state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
             singer.write_state(state)
             raise
     return counter
