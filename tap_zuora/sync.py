@@ -107,15 +107,6 @@ def sync_rest_stream(client, state, stream, counter):
     if file_ids:
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
-    # TODO: This is using the wrong bookmark when resuming in some cases, it'll re-issue the previous job's range
-    # TODO: This might be best to just revert and provide the functionality for only the AQuA API...
-    in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
-    if in_progress_job:
-        LOGGER.info("Found interrupted export job {}, resuming...".format(in_progress_job))
-        file_ids = poll_job_until_done(in_progress_job, client, apis.Rest)
-        counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
-        state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
-
     if stream.get("replication_key"):
         sync_started = pendulum.utcnow()
         start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
@@ -128,34 +119,32 @@ def sync_rest_stream(client, state, stream, counter):
             start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
             end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
             job_id = apis.Rest.create_job(client, stream, start_date, end_date)
-            state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
             file_ids = poll_job_until_done(job_id, client, apis.Rest)
             counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
             start_pen = end_pen
     else:
         job_id = apis.Rest.create_job(client, stream)
-        state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
         file_ids = poll_job_until_done(job_id, client, apis.Rest)
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
-    state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
     return counter
 
 
 def sync_stream(client, state, stream, force_rest=False):
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
-        try:
-            if force_rest:
+        if force_rest:
+            try:
                 counter = sync_rest_stream(client, state, stream, counter)
-            else:
-                counter = sync_aqua_stream(client, state, stream, counter)
-        except apis.ExportTimedOut as ex:
-            LOGGER.info("Export timed out, writing state before exiting...".format(ex))
-            singer.write_state(state)
-            raise
-        except apis.ExportFailed as ex:
-            # Ensure that we don't cache a failing job
-            state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
-            singer.write_state(state)
-            raise
+            except apis.ExportTimedOut as ex:
+                LOGGER.info("Export timed out, writing state before exiting...".format(ex))
+                singer.write_state(state)
+                raise
+            except apis.ExportFailed as ex:
+                # Ensure that we don't cache a failing job
+                state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
+                singer.write_state(state)
+                raise
+        else:
+            counter = sync_aqua_stream(client, state, stream, counter)
+
     return counter
