@@ -142,7 +142,7 @@ def sync_stream(client, state, stream, force_rest=False):
                 singer.write_state(state)
                 raise
             except apis.ExportFailed as ex:
-                # Ensure that we don't cache a failing job
+                # Ensure that we don't retry a failing job
                 state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
                 singer.write_state(state)
                 raise
