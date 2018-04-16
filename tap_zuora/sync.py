@@ -110,6 +110,7 @@ def sync_rest_stream(client, state, stream, counter):
     if in_progress_job:
         file_ids = poll_job_until_done(in_progress_job, client, apis.Rest)
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
+        state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
 
     if stream.get("replication_key"):
         sync_started = pendulum.utcnow()
