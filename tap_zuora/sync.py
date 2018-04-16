@@ -42,7 +42,7 @@ def poll_job_until_done(job_id, client, api):
 
         time.sleep(DEFAULT_POLL_INTERVAL)
 
-    raise apis.ExportFailed("TimedOut")
+    raise apis.ExportTimedOut()
 
 
 def sync_file_ids(file_ids, client, state, stream, api, counter):
@@ -85,18 +85,30 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
 def sync_aqua_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
-    if not file_ids:
+    in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
+    if in_progress_job:
+        file_ids = poll_job_until_done(in_progress_job, client, apis.Aqua)
+        state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
+        singer.write_state(state)
+    elif not file_ids:
         job_id = apis.Aqua.create_job(client, state, stream)
+        state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
         file_ids = poll_job_until_done(job_id, client, apis.Aqua)
         state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
         singer.write_state(state)
 
+    state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
     return sync_file_ids(file_ids, client, state, stream, apis.Aqua, counter)
 
 
 def sync_rest_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
     if file_ids:
+        counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
+
+    in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
+    if in_progress_job:
+        file_ids = poll_job_until_done(in_progress_job, client, apis.Rest)
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
     if stream.get("replication_key"):
@@ -111,22 +123,33 @@ def sync_rest_stream(client, state, stream, counter):
             start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
             end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
             job_id = apis.Rest.create_job(client, stream, start_date, end_date)
+            state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
             file_ids = poll_job_until_done(job_id, client, apis.Rest)
             counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
             start_pen = end_pen
     else:
         job_id = apis.Rest.create_job(client, stream)
+        state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
         file_ids = poll_job_until_done(job_id, client, apis.Rest)
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
+    state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
     return counter
 
 
 def sync_stream(client, state, stream, force_rest=False):
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
-        if force_rest:
-            counter = sync_rest_stream(client, state, stream, counter)
-        else:
-            counter = sync_aqua_stream(client, state, stream, counter)
-
+        try:
+            if force_rest:
+                counter = sync_rest_stream(client, state, stream, counter)
+            else:
+                counter = sync_aqua_stream(client, state, stream, counter)
+        except apis.ExportTimedOut as ex:
+            # TODO: Resume in progress job if we can
+            # TODO: We might need to check some information in the poll response to help
+            # the API for jobs returns "status: executing" or "status: completed" on the response
+            # Likely a failed option as well. Check the batch-query/jobs docs
+            LOGGER.info("Export failed: {}, writing state before exiting...".format(ex))
+            singer.write_state(state)
+            raise
     return counter

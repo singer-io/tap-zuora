@@ -39,6 +39,9 @@ def format_datetime_zoql(datetime_str, date_format):
 class ExportFailed(Exception):
     pass
 
+class ExportTimedOut(ExportFailed):
+    def __init__(self):
+        super().__init__("TimedOut")
 
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
