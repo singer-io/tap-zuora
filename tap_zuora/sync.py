@@ -87,6 +87,7 @@ def sync_aqua_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
     in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
     if in_progress_job:
+        LOGGER.info("Found interrupted export job {}, resuming...".format(in_progress_job))
         file_ids = poll_job_until_done(in_progress_job, client, apis.Aqua)
         state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
         singer.write_state(state)
@@ -106,8 +107,11 @@ def sync_rest_stream(client, state, stream, counter):
     if file_ids:
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
+    # TODO: This is using the wrong bookmark when resuming in some cases, it'll re-issue the previous job's range
+    # TODO: This might be best to just revert and provide the functionality for only the AQuA API...
     in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
     if in_progress_job:
+        LOGGER.info("Found interrupted export job {}, resuming...".format(in_progress_job))
         file_ids = poll_job_until_done(in_progress_job, client, apis.Rest)
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
         state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
