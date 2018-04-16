@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+  * Adds ability for timed-out AQuA requests to continue to request the export in subsequent runs through the state
+  * Upgrade singer-python to 5.0.15
+
 ## 0.2.3
   * Bumps version of singer-python to 5.0.14 to fix datetime strftime issues documented in [#69](https://github.com/singer-io/singer-python/pull/69)
 
