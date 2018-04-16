@@ -133,8 +133,10 @@ def sync_rest_stream(client, state, stream, counter):
 def sync_stream(client, state, stream, force_rest=False):
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
         if force_rest:
+            counter = sync_rest_stream(client, state, stream, counter)
+        else:
             try:
-                counter = sync_rest_stream(client, state, stream, counter)
+                counter = sync_aqua_stream(client, state, stream, counter)
             except apis.ExportTimedOut as ex:
                 LOGGER.info("Export timed out, writing state before exiting...".format(ex))
                 singer.write_state(state)
@@ -144,7 +146,5 @@ def sync_stream(client, state, stream, force_rest=False):
                 state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
                 singer.write_state(state)
                 raise
-        else:
-            counter = sync_aqua_stream(client, state, stream, counter)
 
     return counter
