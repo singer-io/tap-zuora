@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.0
+  * Initial release to Stitch platform for production
+
 ## 0.3.0
   * Adds ability for timed-out AQuA requests to continue to request the export in subsequent runs through the state
   * Upgrade singer-python to 5.0.15
