@@ -42,7 +42,7 @@ def poll_job_until_done(job_id, client, api):
 
         time.sleep(DEFAULT_POLL_INTERVAL)
 
-    raise apis.ExportFailed("TimedOut")
+    raise apis.ExportTimedOut()
 
 
 def sync_file_ids(file_ids, client, state, stream, api, counter):
@@ -85,12 +85,20 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
 def sync_aqua_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
-    if not file_ids:
+    in_progress_job = state["bookmarks"][stream["tap_stream_id"]].get("in_progress_job")
+    if in_progress_job:
+        LOGGER.info("Found interrupted export job {}, resuming...".format(in_progress_job))
+        file_ids = poll_job_until_done(in_progress_job, client, apis.Aqua)
+        state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
+        singer.write_state(state)
+    elif not file_ids:
         job_id = apis.Aqua.create_job(client, state, stream)
+        state["bookmarks"][stream["tap_stream_id"]]["in_progress_job"] = job_id
         file_ids = poll_job_until_done(job_id, client, apis.Aqua)
         state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
         singer.write_state(state)
 
+    state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
     return sync_file_ids(file_ids, client, state, stream, apis.Aqua, counter)
 
 
@@ -127,6 +135,16 @@ def sync_stream(client, state, stream, force_rest=False):
         if force_rest:
             counter = sync_rest_stream(client, state, stream, counter)
         else:
-            counter = sync_aqua_stream(client, state, stream, counter)
+            try:
+                counter = sync_aqua_stream(client, state, stream, counter)
+            except apis.ExportTimedOut as ex:
+                LOGGER.info("Export timed out, writing state before exiting...".format(ex))
+                singer.write_state(state)
+                raise
+            except apis.ExportFailed as ex:
+                # Ensure that we don't retry a failing job
+                state["bookmarks"][stream["tap_stream_id"]].pop("in_progress_job", None)
+                singer.write_state(state)
+                raise
 
     return counter

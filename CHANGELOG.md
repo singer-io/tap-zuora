@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0
+  * Initial release to Stitch platform for production
+
+## 0.3.0
+  * Adds ability for timed-out AQuA requests to continue to request the export in subsequent runs through the state
+  * Upgrade singer-python to 5.0.15
+
+## 0.2.3
+  * Bumps version of singer-python to 5.0.14 to fix datetime strftime issues documented in [#69](https://github.com/singer-io/singer-python/pull/69)
+
 ## 0.2.2
   * Changes the discovery behavior to all any field to have a null value - not just "required" fields [#17](https://github.com/singer-io/tap-zuora/pull/17)
 
