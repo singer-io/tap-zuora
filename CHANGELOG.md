@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+  * Fixes bug where rest queries did not have a '.' between the name of a joined object and the field
+  * Bumps version of singer-python to 5.1.0
+
 ## 1.0.0
   * Initial release to Stitch platform for production
 
