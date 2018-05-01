@@ -18,7 +18,7 @@ LOGGER = singer.get_logger()
 
 
 def parse_csv_line(line):
-    reader = csv.reader(io.StringIO(line.decode('utf-8')))
+    reader = csv.reader(io.StringIO(line.decode('utf-8').replace('\0', '')))
     return next(reader)
 
 
