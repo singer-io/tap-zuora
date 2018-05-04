@@ -40,8 +40,8 @@ class ExportFailed(Exception):
     pass
 
 class ExportTimedOut(ExportFailed):
-    def __init__(self):
-        super().__init__("TimedOut")
+    def __init__(self, timeout, unit):
+        super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
 
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -105,10 +105,18 @@ class Aqua:
         fields = ", ".join(dotted_field_names)
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
         if stream.get("replication_key"):
-            bookmark = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
+            replication_key = stream["replication_key"]
+            bookmark = state["bookmarks"][stream["tap_stream_id"]][replication_key]
             start_date = format_datetime_zoql(bookmark, Aqua.ZOQL_DATE_FORMAT)
-            query += " where {} >= '{}'".format(stream["replication_key"], start_date)
-            query += " order by {} asc".format(stream["replication_key"])
+            window_end = state["bookmarks"][stream["tap_stream_id"]].get("current_window_end")
+            if bookmark == window_end:
+                query += " where {} = '{}'".format(replication_key, start_date)
+            else:
+                query += " where {} >= '{}'".format(replication_key, start_date)
+                if window_end:
+                    query += " and {} <= '{}'".format(replication_key,
+                                                      format_datetime_zoql(window_end, Aqua.ZOQL_DATE_FORMAT))
+            query += " order by {} asc".format(replication_key)
 
         LOGGER.info("Executing query: %s", query)
         return query
