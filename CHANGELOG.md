@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+  * (AQuA API) Replace the job_id retry pattern with a query window reduction pattern when a single job takes longer than the timeout.
+  * Upgrade singer-python to 5.1.1
+
 ## 1.0.2
   * Fixes a bug where the CSV reader can choke on CSV data containing null bytes [#21](https://github.com/singer-io/tap-zuora/pull/21)
 
