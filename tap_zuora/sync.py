@@ -8,7 +8,6 @@ import singer
 from singer import transform
 from tap_zuora import apis
 
-
 PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
 DEFAULT_JOB_TIMEOUT = 5400
@@ -42,7 +41,7 @@ def poll_job_until_done(job_id, client, api):
 
         time.sleep(DEFAULT_POLL_INTERVAL)
 
-    raise apis.ExportTimedOut()
+    raise apis.ExportTimedOut(DEFAULT_JOB_TIMEOUT // 60, "minutes")
 
 
 def sync_file_ids(file_ids, client, state, stream, api, counter):

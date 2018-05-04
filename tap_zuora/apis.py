@@ -40,8 +40,8 @@ class ExportFailed(Exception):
     pass
 
 class ExportTimedOut(ExportFailed):
-    def __init__(self):
-        super().__init__("TimedOut")
+    def __init__(self, timeout, unit):
+        super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
 
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
