@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+  * Fixes a bug where the CSV reader can choke on CSV data containing null bytes [#21](https://github.com/singer-io/tap-zuora/pull/21)
+
+## 1.0.1
+  * Fixes bug where rest queries did not have a '.' between the name of a joined object and the field
+  * Bumps version of singer-python to 5.1.0
+
 ## 1.0.0
   * Initial release to Stitch platform for production
 

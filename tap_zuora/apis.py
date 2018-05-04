@@ -206,7 +206,9 @@ class Rest:
 
     @staticmethod
     def get_query(stream, start_date, end_date):
-        fields = ", ".join(selected_fields(stream))
+        selected_field_names = selected_fields(stream)
+        dotted_field_names = joined_fields(selected_field_names, stream)
+        fields = ", ".join(dotted_field_names)
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
 
         if stream.get("replication_key") and start_date and end_date:
