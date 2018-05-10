@@ -23,14 +23,14 @@ def selected_fields(stream):
 
 def joined_fields(fields, stream):
     mdata = metadata.to_map(stream['metadata'])
-    joined_fields = []
+    joined_fields_list = []
     for field_name in fields:
         joined_obj = metadata.get(mdata, ('properties', field_name), 'tap-zuora.joined_object')
         if joined_obj:
-            joined_fields.append(joined_obj + '.' + field_name.replace(joined_obj, ""))
+            joined_fields_list.append(joined_obj + '.' + field_name.replace(joined_obj, ""))
         else:
-            joined_fields.append(field_name)
-    return joined_fields
+            joined_fields_list.append(field_name)
+    return joined_fields_list
 
 def format_datetime_zoql(datetime_str, date_format):
     return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)

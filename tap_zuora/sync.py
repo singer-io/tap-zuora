@@ -83,7 +83,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
 def handle_timeout(ex, stream, state):
     if stream.get("replication_key"):
-        LOGGER.info("Export timed out, reducing query window and writing state.".format(ex))
+        LOGGER.info("Export timed out, reducing query window and writing state.")
         window_bookmark = state["bookmarks"][stream["tap_stream_id"]].get("current_window_end")
         previous_window_end = pendulum.parse(window_bookmark) if window_bookmark else pendulum.utcnow()
         window_start = pendulum.parse(state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]])

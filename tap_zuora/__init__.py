@@ -58,7 +58,8 @@ def validate_state(config, catalog, state):
         if not stream.replication_key:
             continue
 
-        if stream.replication_key not in state["bookmarks"][stream.tap_stream_id]:
+        if stream.replication_key not in state["bookmarks"][stream.tap_stream_id] or \
+           state["bookmarks"][stream.tap_stream_id][stream.replication_key] is None:
             LOGGER.info("Setting start date for %s to %s", stream.tap_stream_id, config["start_date"])
             state["bookmarks"][stream.tap_stream_id][stream.replication_key] = config["start_date"]
 
