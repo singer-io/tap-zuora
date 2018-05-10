@@ -56,8 +56,8 @@ def get_field_dict(client, stream_name):
             LOGGER.info("%s.%s has an unsupported data type", stream_name, field_info["name"])
             supported = False
         elif "export" not in field_info["contexts"]:
-           LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
-           continue
+            LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
+            continue
 
         field_dict[field_info["name"]] = {
             "type": field_info["type"],
@@ -89,10 +89,10 @@ def discover_stream_names(client):
     return [t.text for t in etree.findall("./object/name")]
 
 
-def discover_stream(client, stream_name, force_rest):
+def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many-branches
     try:
         field_dict = get_field_dict(client, stream_name)
-    except ApiException as e:
+    except ApiException:
         return None
 
     properties = {}
@@ -111,8 +111,6 @@ def discover_stream(client, stream_name, force_rest):
             field_properties["format"] = "date-time"
         else:
             field_properties["type"] = props["type"]
-
-        path = "{}.{}".format(stream_name, field_name)
 
         if props["supported"]:
             field_properties["type"] = [field_properties["type"], "null"]
@@ -175,5 +173,5 @@ def discover_streams(client, force_rest):
             failed_stream_names.append(stream_name)
 
     if failed_stream_names:
-        LOGGER.info('Failed to discover following streams: {}'.format(failed_stream_names))
+        LOGGER.info('Failed to discover following streams: %s', failed_stream_names)
     return streams
