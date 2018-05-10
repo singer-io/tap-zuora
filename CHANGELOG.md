@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+  * (AQuA API) The tap will now retry immediately in the event of an export job's timeout
+  * State now tolerates a bookmark that is null, and will fall back to `start_date` in this case
+
 ## 1.0.3
   * (AQuA API) Replace the job_id retry pattern with a query window reduction pattern when a single job takes longer than the timeout.
   * Upgrade singer-python to 5.1.1
