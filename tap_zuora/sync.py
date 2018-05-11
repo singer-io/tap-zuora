@@ -59,6 +59,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
                 continue
 
             parsed_line = parse_csv_line(line)
+            if len(header) != len(parsed_line):
+                LOGGER.warn("Detected truncated CSV line, aborting export download and saving state.")
+                break # Break out of the loop, keep the bookmark where we are and try again next sync
+
             row = dict(zip(header, parsed_line))
             record = transform(row, stream['schema'])
             if stream.get("replication_key"):
