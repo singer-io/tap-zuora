@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.5
+  * Fixes a bug where a bad record with a null bookmark can wipe out the state [#25](https://github.com/singer-io/tap-zuora/pull/25)
+
 ## 1.0.4
   * (AQuA API) The tap will now retry immediately in the event of an export job's timeout
   * State now tolerates a bookmark that is null, and will fall back to `start_date` in this case
