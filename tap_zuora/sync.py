@@ -63,6 +63,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
             record = transform(row, stream['schema'])
             if stream.get("replication_key"):
                 bookmark = record.get(stream["replication_key"])
+                if not bookmark:
+                    # There's a chance we get back a bad record here, and we don't want to null the bookmark
+                    continue
+
                 if bookmark and bookmark < start_date:
                     continue
 
