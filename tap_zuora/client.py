@@ -21,7 +21,7 @@ URLS = {
     (IS_REST, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
 }
 
-LATEST_WSDL_VERSION = "87.0"
+LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
 
@@ -60,7 +60,7 @@ class Client:
         return {
             'apiAccessKeyId': self.username,
             'apiSecretAccessKey': self.password,
-            'x-zuora-wsdl-version': LATEST_WSDL_VERSION,
+            'X-Zuora-WSDL-Version': LATEST_WSDL_VERSION,
             'Content-Type': 'application/json',
         }
 
