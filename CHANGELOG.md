@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.6
+  * Fixes some bugs discovered where v1/export queries would fail selected certain fields [#26](https://github.com/singer-io/tap-zuora/pull/26)
+
 ## 1.0.5
   * Fixes a bug where a bad record with a null bookmark can wipe out the state [#25](https://github.com/singer-io/tap-zuora/pull/25)
 
