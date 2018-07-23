@@ -41,6 +41,9 @@ class Client:
         self.partner_id = partner_id
         self._session = requests.Session()
 
+        adapter = requests.adapters.HTTPAdapter(max_retries=1) # Try again in the case the TCP socket closes
+        self._session.mount('https://', adapter)
+
     @staticmethod
     def from_config(config):
         sandbox = config.get('sandbox', False) == 'true'
