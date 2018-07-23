@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.7
+  * Adds retry to the requests Session object, in the event that a long-lasting TCP connection gets snapped by Zuora [#27](https://github.com/singer-io/tap-zuora/pull/27)
+
 ## 1.0.6
   * Fixes some bugs discovered where v1/export queries would fail selected certain fields [#26](https://github.com/singer-io/tap-zuora/pull/26)
 
