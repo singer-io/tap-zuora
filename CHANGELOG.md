@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0
+  * (REST API) The tap will now reduce the query window in half in the event of a timeout until it cannot reduce it further (down to a single second) [#28](https://github.com/singer-io/tap-zuora/pull/28)
+
 ## 1.0.7
   * Adds retry to the requests Session object, in the event that a long-lasting TCP connection gets snapped by Zuora [#27](https://github.com/singer-io/tap-zuora/pull/27)
 
