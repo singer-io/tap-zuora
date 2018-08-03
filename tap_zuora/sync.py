@@ -134,43 +134,48 @@ def handle_rest_timeout(ex, stream, current_window, start_pen):
                                     .format(stream["replication_key"], start_pen)) from ex
         return new_window
 
-def sync_rest_stream(client, state, stream, counter, window_length=None):
+def iterate_rest_query_window(client, state, stream, counter,
+                              start_pen, sync_started, window_length):
+    try:
+        timed_out = False
+        while start_pen < sync_started:
+            end_pen = start_pen.add(seconds=window_length)
+            if end_pen > sync_started:
+                end_pen = sync_started
+
+            start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
+            end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
+            job_id = apis.Rest.create_job(client, stream, start_date, end_date)
+            file_ids = poll_job_until_done(job_id, client, apis.Rest)
+            counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
+            start_pen = end_pen
+            window_length = MAX_EXPORT_DAYS * 86400
+    except apis.ExportTimedOut as ex:
+        window_length = handle_rest_timeout(ex,
+                                            stream,
+                                            window_length,
+                                            start_pen)
+        timed_out = True
+
+    if timed_out:
+        LOGGER.info("Retrying timed out sync job...")
+        return iterate_rest_query_window(client, state, stream, counter,
+                                         start_pen, sync_started, window_length)
+    return counter
+
+def sync_rest_stream(client, state, stream, counter):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
     if file_ids:
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
     if stream.get("replication_key"):
-        window_length_in_seconds = window_length or MAX_EXPORT_DAYS * 86400
-        timed_out = False
-        try:
-            sync_started = pendulum.utcnow()
-            start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
-            start_pen = pendulum.parse(start_date)
-            while start_pen < sync_started:
-                end_pen = start_pen.add(seconds=window_length_in_seconds)
-                if end_pen > sync_started:
-                    end_pen = sync_started
-
-                start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
-                end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
-                job_id = apis.Rest.create_job(client, stream, start_date, end_date)
-                file_ids = poll_job_until_done(job_id, client, apis.Rest)
-                counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
-                start_pen = end_pen
-        except apis.ExportTimedOut as ex:
-            window_length_in_seconds = handle_rest_timeout(ex,
-                                                           stream,
-                                                           window_length_in_seconds,
-                                                           start_pen)
-            timed_out = True
-
-        if timed_out:
-            LOGGER.info("Retrying timed out sync job...")
-            return sync_rest_stream(client,
-                                    state,
-                                    stream,
-                                    counter,
-                                    window_length=window_length_in_seconds)
+        # TODO: Bookmark goes here
+        window_length_in_seconds = MAX_EXPORT_DAYS * 86400
+        sync_started = pendulum.utcnow()
+        start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
+        start_pen = pendulum.parse(start_date)
+        counter = iterate_rest_query_window(client, state, stream, counter,
+                                            start_pen, sync_started, window_length_in_seconds)
     else:
         job_id = apis.Rest.create_job(client, stream)
         file_ids = poll_job_until_done(job_id, client, apis.Rest)
