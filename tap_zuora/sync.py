@@ -7,6 +7,7 @@ import singer
 
 from singer import transform
 from tap_zuora import apis
+from tap_zuora.client import ApiException
 
 PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
@@ -52,7 +53,14 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
     while file_ids:
         file_id = file_ids.pop(0)
-        lines = api.stream_file(client, file_id)
+        try:
+            lines = api.stream_file(client, file_id)
+        except ApiException as ex:
+            # If the file has been deleted, write state with popped file_id removed and re-raise.
+            # Don't advance the bookmark until the sync window can be completed fully.
+            if ex.resp.status_code == 404:
+                singer.write_state(state)
+                raise
         header = parse_header_line(next(lines), stream["tap_stream_id"])
         for line in lines:
             if not line:
