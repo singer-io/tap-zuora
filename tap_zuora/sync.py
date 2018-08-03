@@ -85,7 +85,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
     singer.write_state(state)
     return counter
 
-def handle_timeout(ex, stream, state):
+def handle_aqua_timeout(ex, stream, state):
     if stream.get("replication_key"):
         LOGGER.info("Export timed out, reducing query window and writing state.")
         window_bookmark = state["bookmarks"][stream["tap_stream_id"]].get("current_window_end")
@@ -117,34 +117,60 @@ def sync_aqua_stream(client, state, stream, counter):
             state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = window_end
         return sync_file_ids(file_ids, client, state, stream, apis.Aqua, counter)
     except apis.ExportTimedOut as ex:
-        handle_timeout(ex, stream, state)
+        handle_aqua_timeout(ex, stream, state)
         timed_out = True
 
     if timed_out:
         LOGGER.info("Retrying timed out sync job...")
         return sync_aqua_stream(client, state, stream, counter)
 
+def handle_rest_timeout(ex, stream, current_window, start_pen):
+    if stream.get("replication_key"):
+        LOGGER.info("Export timed out, reducing query window and writing state.")
+        new_window = current_window // 2
+        if new_window == 0:
+            raise apis.ExportFailed("Export too large for smallest possible query window. " +
+                                    "Cannot subdivide any further. ({}: {})"
+                                    .format(stream["replication_key"], start_pen)) from ex
+        return new_window
 
-def sync_rest_stream(client, state, stream, counter):
+def sync_rest_stream(client, state, stream, counter, window_length=None):
     file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
     if file_ids:
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
     if stream.get("replication_key"):
-        sync_started = pendulum.utcnow()
-        start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
-        start_pen = pendulum.parse(start_date)
-        while start_pen < sync_started:
-            end_pen = start_pen.add(days=MAX_EXPORT_DAYS)
-            if end_pen > sync_started:
-                end_pen = sync_started
+        window_length_in_seconds = window_length or MAX_EXPORT_DAYS * 86400
+        timed_out = False
+        try:
+            sync_started = pendulum.utcnow()
+            start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
+            start_pen = pendulum.parse(start_date)
+            while start_pen < sync_started:
+                end_pen = start_pen.add(seconds=window_length_in_seconds)
+                if end_pen > sync_started:
+                    end_pen = sync_started
 
-            start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
-            end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
-            job_id = apis.Rest.create_job(client, stream, start_date, end_date)
-            file_ids = poll_job_until_done(job_id, client, apis.Rest)
-            counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
-            start_pen = end_pen
+                start_date = start_pen.strftime("%Y-%m-%d %H:%M:%S")
+                end_date = end_pen.strftime("%Y-%m-%d %H:%M:%S")
+                job_id = apis.Rest.create_job(client, stream, start_date, end_date)
+                file_ids = poll_job_until_done(job_id, client, apis.Rest)
+                counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
+                start_pen = end_pen
+        except apis.ExportTimedOut as ex:
+            window_length_in_seconds = handle_rest_timeout(ex,
+                                                           stream,
+                                                           window_length_in_seconds,
+                                                           start_pen)
+            timed_out = True
+
+        if timed_out:
+            LOGGER.info("Retrying timed out sync job...")
+            return sync_rest_stream(client,
+                                    state,
+                                    stream,
+                                    counter,
+                                    window_length=window_length_in_seconds)
     else:
         job_id = apis.Rest.create_job(client, stream)
         file_ids = poll_job_until_done(job_id, client, apis.Rest)
