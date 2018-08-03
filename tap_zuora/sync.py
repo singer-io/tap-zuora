@@ -124,7 +124,7 @@ def sync_aqua_stream(client, state, stream, counter):
         LOGGER.info("Retrying timed out sync job...")
         return sync_aqua_stream(client, state, stream, counter)
 
-def handle_rest_timeout(ex, stream, current_window, start_pen):
+def handle_rest_timeout(ex, stream, state, current_window, start_pen):
     if stream.get("replication_key"):
         LOGGER.info("Export timed out, reducing query window and writing state.")
         new_window = current_window // 2
@@ -132,6 +132,8 @@ def handle_rest_timeout(ex, stream, current_window, start_pen):
             raise apis.ExportFailed("Export too large for smallest possible query window. " +
                                     "Cannot subdivide any further. ({}: {})"
                                     .format(stream["replication_key"], start_pen)) from ex
+        state["bookmarks"][stream["tap_stream_id"]]["window_length"] = new_window
+        singer.write_state(state)
         return new_window
 
 def iterate_rest_query_window(client, state, stream, counter,
@@ -150,9 +152,13 @@ def iterate_rest_query_window(client, state, stream, counter,
             counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
             start_pen = end_pen
             window_length = MAX_EXPORT_DAYS * 86400
+            state["bookmarks"][stream["tap_stream_id"]].pop("window_length", None)
+            state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = end_date
+            singer.write_state(state)
     except apis.ExportTimedOut as ex:
         window_length = handle_rest_timeout(ex,
                                             stream,
+                                            state,
                                             window_length,
                                             start_pen)
         timed_out = True
@@ -169,8 +175,8 @@ def sync_rest_stream(client, state, stream, counter):
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
     if stream.get("replication_key"):
-        # TODO: Bookmark goes here
-        window_length_in_seconds = MAX_EXPORT_DAYS * 86400
+        bookmark_window_length = state["bookmarks"][stream["tap_stream_id"]].pop("window_length", None)
+        window_length_in_seconds = bookmark_window_length or MAX_EXPORT_DAYS * 86400
         sync_started = pendulum.utcnow()
         start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
         start_pen = pendulum.parse(start_date)
