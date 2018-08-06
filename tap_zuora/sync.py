@@ -56,9 +56,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
         try:
             lines = api.stream_file(client, file_id)
         except ApiException as ex:
-            # If the file has been deleted, write state with popped file_id removed and re-raise.
-            # Don't advance the bookmark until the sync window can be completed fully.
+            # If the file has been deleted, write state with "file_ids" removed and re-raise.
+            # Don't advance the bookmark until all files in the window have been synced.
             if ex.resp.status_code == 404:
+                state["bookmarks"][stream["tap_stream_id"]].pop("file_ids", None)
                 singer.write_state(state)
                 raise
         header = parse_header_line(next(lines), stream["tap_stream_id"])
