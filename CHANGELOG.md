@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+  * When resuming sync from `file_ids` in the state, there's a chance that a file could be deleted. If this occurs, the tap will remove the `file_ids` state value and resume from the bookmark on the next run to ensure a full window of data [#29](https://github.com/singer-io/tap-zuora/pull/29)
+
 ## 1.1.0
   * (REST API) The tap will now reduce the query window in half in the event of a timeout until it cannot reduce it further (down to a single second) [#28](https://github.com/singer-io/tap-zuora/pull/28)
 
