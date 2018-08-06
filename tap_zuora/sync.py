@@ -61,7 +61,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
             if ex.resp.status_code == 404:
                 state["bookmarks"][stream["tap_stream_id"]].pop("file_ids", None)
                 singer.write_state(state)
-                raise
+            raise
         header = parse_header_line(next(lines), stream["tap_stream_id"])
         for line in lines:
             if not line:
