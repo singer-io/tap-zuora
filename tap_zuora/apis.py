@@ -10,6 +10,18 @@ NO_DELETED_SUPPORT = ("Objects included in the queries do not support the queryi
 
 LOGGER = singer.get_logger()
 
+IS_PROD = False
+IS_SAND = True
+NOT_EURO = False
+IS_EURO = True
+
+APIS = {
+    (IS_PROD, NOT_EURO): "apps/api",
+    (IS_PROD, IS_EURO): "apps/api",
+    (IS_SAND, NOT_EURO): "apps/api",
+    (IS_SAND, IS_EURO): "v1",
+}
+
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
     fields = [f for f, s in stream["schema"]["properties"].items()
@@ -141,8 +153,12 @@ class Aqua:
         return payload
 
     @staticmethod
+    def get_url(client):
+        return APIS[(client.european, client.sandbox)]
+
+    @staticmethod
     def create_job(client, state, stream):
-        endpoint = "apps/api/batch-query/"
+        endpoint = "{}/batch-query/".format(Aqua.get_url(client))
         payload = Aqua.get_payload(state, stream, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
         if "message" in resp:
@@ -152,7 +168,7 @@ class Aqua:
 
     @staticmethod
     def stream_status(client, stream_name):
-        endpoint = "apps/api/batch-query/"
+        endpoint = "{}/batch-query/".format(Aqua.get_url(client))
         query = "select * from {} limit 1".format(stream_name)
         payload = Aqua.make_payload(stream_name, "discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
@@ -169,7 +185,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def job_ready(client, job_id):
-        endpoint = "apps/api/batch-query/jobs/{}".format(job_id)
+        endpoint = "{}/batch-query/jobs/{}".format(Aqua.get_url(client), job_id)
         data = client.aqua_request("GET", endpoint).json()
         if data["status"] == "completed":
             return True
@@ -181,7 +197,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def get_file_ids(client, job_id):
-        endpoint = "apps/api/batch-query/jobs/{}".format(job_id)
+        endpoint = "{}/batch-query/jobs/{}".format(Aqua.get_url(client), job_id)
         data = client.aqua_request("GET", endpoint).json()
         if "segments" in data["batches"][0]:
             return data["batches"][0]["segments"]
@@ -190,7 +206,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def stream_file(client, file_id):
-        endpoint = "apps/api/file/{}".format(file_id)
+        endpoint = "{}/file/{}".format(Aqua.get_url(client), file_id)
         return client.aqua_request("GET", endpoint, stream=True).iter_lines()
 
 
