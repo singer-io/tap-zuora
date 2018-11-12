@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.3
+  * Update version of `requests` to `0.20.0` in response to CVE 2018-18074
+
 ## 1.1.2
   * Whether the Zuora instance is a sandbox or a European instance affects URL paths for AQUA [#30](https://github.com/singer-io/tap-zuora/pull/30)
 
