@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+  * Updates the tuple access of the AQUA endpoint switch [#31](https://github.com/singer-io/tap-zuora/pull/31)
+
 ## 1.1.3
   * Update version of `requests` to `2.20.0` in response to CVE 2018-18074
 
