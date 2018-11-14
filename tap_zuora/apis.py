@@ -17,7 +17,7 @@ IS_EURO = True
 
 APIS = {
     (IS_PROD, NOT_EURO): "apps/api",
-    (IS_PROD, IS_EURO): "apps/api",
+    (IS_PROD, IS_EURO): "v1",
     (IS_SAND, NOT_EURO): "apps/api",
     (IS_SAND, IS_EURO): "v1",
 }
@@ -154,7 +154,7 @@ class Aqua:
 
     @staticmethod
     def get_url(client):
-        return APIS[(client.european, client.sandbox)]
+        return APIS[(client.sandbox, client.european)]
 
     @staticmethod
     def create_job(client, state, stream):
