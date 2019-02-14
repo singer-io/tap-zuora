@@ -174,8 +174,11 @@ class Aqua:
         # Log to show whether the aqua response is in full or incremental
         # mode based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
-        LOGGER.info("Received aqua response with batch fulls=%s",
-                    [x['full'] for x in resp['batches']])
+        if 'batches' in resp:
+            LOGGER.info("Received aqua response with batch fulls=%s",
+                        [x.get('full', None) for x in resp['batches']])
+        else:
+            LOGGER.info("Received aqua response with no batches")
         if "message" in resp:
             raise ExportFailed(resp["message"])
 
