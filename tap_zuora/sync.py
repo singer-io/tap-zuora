@@ -53,6 +53,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
 
     while file_ids:
         file_id = file_ids.pop(0)
+        # Tracking variable to see whether we saw a deleted record
+        # anywhere in this batch file. Needs to reset after processing
+        # each file.
+        saw_deleted = False
         try:
             lines = api.stream_file(client, file_id)
         except ApiException as ex:
@@ -73,6 +77,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
             parsed_line = parse_csv_line(line)
             row = dict(zip(header, parsed_line))
             record = transform(row, stream['schema'])
+            # safe get because not all records will have 'Deleted'
+            if record.get('Deleted', False):
+                # We should emit that we saw a deleted record
+                saw_deleted = True
             if stream.get("replication_key"):
                 bookmark = record.get(stream["replication_key"])
                 if not bookmark:
@@ -89,6 +97,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
                 singer.write_record(stream["tap_stream_id"], record)
 
             counter.increment()
+
+        if saw_deleted:
+            # https://stitchdata.atlassian.net/browse/SRCE-322
+            LOGGER.info("Saw a deleted record in %s", file_id)
 
         state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
         singer.write_state(state)

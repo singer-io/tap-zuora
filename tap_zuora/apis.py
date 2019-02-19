@@ -159,8 +159,26 @@ class Aqua:
     @staticmethod
     def create_job(client, state, stream):
         endpoint = "{}/batch-query/".format(Aqua.get_url(client))
+        # This _always_ submits with an incremental_time which I think
+        # means that we're never executing a full export which means we
+        # can't establish a baseline to report deletes on.
+        # https://stitchdata.atlassian.net/browse/SRCE-322
         payload = Aqua.get_payload(state, stream, client.partner_id)
+        # Log to show whether the aqua request should trigger a full or
+        # incremental response based on
+        # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
+        LOGGER.info("Submitting aqua request with `%s`",
+                    {k: v for k, v in payload.items()
+                     if k in {'partner', 'project', 'incrementalTime'}})
         resp = client.aqua_request("POST", endpoint, json=payload).json()
+        # Log to show whether the aqua response is in full or incremental
+        # mode based on
+        # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
+        if 'batches' in resp:
+            LOGGER.info("Received aqua response with batch fulls=%s",
+                        [x.get('full', None) for x in resp['batches']])
+        else:
+            LOGGER.info("Received aqua response with no batches")
         if "message" in resp:
             raise ExportFailed(resp["message"])
 

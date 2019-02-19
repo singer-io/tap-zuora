@@ -14,6 +14,11 @@ setup(name='tap-zuora',
           'requests==2.20.0',
           'pendulum==1.2.0',
       ],
+      extras_require={
+          'dev': [
+              'ipdb'
+          ]
+      },
       entry_points='''
           [console_scripts]
           tap-zuora=tap_zuora:main
