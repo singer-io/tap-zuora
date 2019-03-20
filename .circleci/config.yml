@@ -16,7 +16,7 @@ jobs:
           command: |
             source ~/.virtualenvs/tap-stripe/bin/activate
             pip install pylint
-            pylint tap_zuora -d missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace
+            pylint tap_zuora -d missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return
       - add_ssh_keys
       - run:
           name: 'Integration Tests'
