@@ -8,14 +8,13 @@ jobs:
       - run:
           name: 'Setup virtual env'
           command: |
-            virtualenv -p python3 ~/.virtualenvs/tap-stripe
-            source ~/.virtualenvs/tap-stripe/bin/activate
+            virtualenv -p python3 ~/.virtualenvs/tap-zuora
+            source ~/.virtualenvs/tap-zuora/bin/activate
             pip install .[dev]
       - run:
           name: 'pylint'
           command: |
-            source ~/.virtualenvs/tap-stripe/bin/activate
-            pip install pylint
+            source ~/.virtualenvs/tap-zuora/bin/activate
             pylint tap_zuora -d missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return
       - add_ssh_keys
       - run:
