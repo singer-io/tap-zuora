@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.6
+  * Detect non-rectangular CSV exports and error if found [#33](https://github.com/singer-io/tap-zuora/pull/33)
+
+## 1.1.5
+  * Log information about the details of an AQuA export to provide insight into `deleted` record behavior at a glance
+
 ## 1.1.4
   * Updates the tuple access of the AQUA endpoint switch [#31](https://github.com/singer-io/tap-zuora/pull/31)
 
