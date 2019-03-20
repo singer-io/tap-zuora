@@ -44,8 +44,11 @@ def poll_job_until_done(job_id, client, api):
 
     raise apis.ExportTimedOut(DEFAULT_JOB_TIMEOUT // 60, "minutes")
 
+def clear_file_ids(state, stream):
+    state["bookmarks"][stream["tap_stream_id"]].pop("file_ids", None)
+    singer.write_state(state)
 
-def sync_file_ids(file_ids, client, state, stream, api, counter):
+def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disable=too-many-branches
     if stream.get("replication_key"):
         start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
     else:
@@ -63,10 +66,10 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
             # If the file has been deleted, write state with "file_ids" removed and re-raise.
             # Don't advance the bookmark until all files in the window have been synced.
             if ex.resp.status_code == 404:
-                state["bookmarks"][stream["tap_stream_id"]].pop("file_ids", None)
-                singer.write_state(state)
+                clear_file_ids(state, stream)
                 raise Exception(("File ID {} has been deleted, making the sync window invalid. "
-                                "Removing partially exported files from state and will resume from bookmark on the next extraction.")
+                                 "Removing partially exported files from state and will resume "
+                                 "from bookmark on the next extraction.")
                                 .format(file_id)) from ex
             raise
         header = parse_header_line(next(lines), stream["tap_stream_id"])
@@ -75,6 +78,13 @@ def sync_file_ids(file_ids, client, state, stream, api, counter):
                 continue
 
             parsed_line = parse_csv_line(line)
+            if len(header) != len(parsed_line):
+                clear_file_ids(state, stream)
+                raise Exception(("Detected that File ID {} is non-rectangular. Found row "
+                                 "with {} entries, expected {} entries from header line. "
+                                 "Will resume from bookmark on next extraction.")
+                                .format(file_id, len(parsed_line), len(header)))
+
             row = dict(zip(header, parsed_line))
             record = transform(row, stream['schema'])
             # safe get because not all records will have 'Deleted'
@@ -159,6 +169,10 @@ def handle_rest_timeout(ex, stream, state, current_window, start_pen):
         state["bookmarks"][stream["tap_stream_id"]]["window_length"] = new_window
         singer.write_state(state)
         return new_window
+    # NB: Pylint caught this, since no return existed. Returning `None` to not change
+    #     the existing return value, but it may not make sense for usage, or never
+    #     get hit (defensive coding might not be necessary above)
+    return None
 
 def iterate_rest_query_window(client, state, stream, counter,
                               start_pen, sync_started, window_length):
