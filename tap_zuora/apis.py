@@ -56,7 +56,9 @@ class ExportTimedOut(ExportFailed):
         super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
 
 class Aqua:
-    ZOQL_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+    # Specifying incrementalTime requires this format, but ZOQL requires the 'T'
+    PARAMETER_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     # Zuora's documentation describes some objects which are not supported for deleted
     # See https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
@@ -148,7 +150,7 @@ class Aqua:
             start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
             inc_pen = pendulum.parse(start_date)
             inc_pen = inc_pen.astimezone(pendulum.timezone("America/Los_Angeles"))
-            payload["incrementalTime"] = inc_pen.strftime(Aqua.ZOQL_DATE_FORMAT)
+            payload["incrementalTime"] = inc_pen.strftime(Aqua.PARAMETER_DATE_FORMAT)
 
         return payload
 
