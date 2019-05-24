@@ -87,7 +87,7 @@ class Client:
         return resp
 
     def is_auth_token_valid(self):
-        if self.oauth2_token and self.token_expiration_date and pendulum.now().utcnow().diff(self.token_expiration_date).in_seconds() > 60: # Allows at least one minute of breathing room
+        if self.oauth2_token and self.token_expiration_date and pendulum.utcnow().diff(self.token_expiration_date).in_seconds() > 60: # Allows at least one minute of breathing room
             return True
         
         return False
@@ -105,7 +105,7 @@ class Client:
         }
 
         token = self._request('POST', url, data=payload).json()
-        self.token_expiration_date = pendulum.now().utcnow().add(seconds=token['expires_in'])
+        self.token_expiration_date = pendulum.utcnow().add(seconds=token['expires_in'])
 
         return token
 
