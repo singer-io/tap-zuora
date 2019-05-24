@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.7
+  * Use T delimited date format for ZOQL AQuA export queries [#35](https://github.com/singer-io/tap-zuora/pull/35)
+
 ## 1.1.6
   * Detect non-rectangular CSV exports and error if found [#33](https://github.com/singer-io/tap-zuora/pull/33)
 
