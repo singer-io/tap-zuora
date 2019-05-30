@@ -101,8 +101,9 @@ def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disa
                     continue
 
                 singer.write_record(stream["tap_stream_id"], record)
-                state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = bookmark
-                singer.write_state(state)
+                if api.api_type == 'REST':
+                    state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = bookmark
+                    singer.write_state(state)
             else:
                 singer.write_record(stream["tap_stream_id"], record)
 
@@ -116,6 +117,11 @@ def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disa
         singer.write_state(state)
 
     state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = None
+
+    # the new bookmark is the end of the window
+    window_end = state["bookmarks"][stream["tap_stream_id"]].pop("current_window_end", None)
+    if api.api_type == 'AQUA' and window_end:
+        state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = window_end
     singer.write_state(state)
     return counter
 
@@ -140,15 +146,15 @@ def sync_aqua_stream(client, state, stream, counter):
     try:
         file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
         if not file_ids:
+            # set window stop time to now
+            if not state["bookmarks"][stream["tap_stream_id"]].get("current_window_end"):
+                window_end = singer.utils.strftime(singer.utils.now())
+                state["bookmarks"][stream["tap_stream_id"]]["current_window_end"] = window_end
             job_id = apis.Aqua.create_job(client, state, stream)
             file_ids = poll_job_until_done(job_id, client, apis.Aqua)
             state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
             singer.write_state(state)
 
-        window_end = state["bookmarks"][stream["tap_stream_id"]].pop("current_window_end", None)
-        if window_end:
-            # Save the window_end as the latest bookmark in case the window was empty
-            state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = window_end
         return sync_file_ids(file_ids, client, state, stream, apis.Aqua, counter)
     except apis.ExportTimedOut as ex:
         handle_aqua_timeout(ex, stream, state)

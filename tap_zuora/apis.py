@@ -56,6 +56,7 @@ class ExportTimedOut(ExportFailed):
         super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
 
 class Aqua:
+    api_type = "AQUA"
     ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
     # Specifying incrementalTime requires this format, but ZOQL requires the 'T'
     PARAMETER_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -231,6 +232,7 @@ class Aqua:
 
 
 class Rest:
+    api_type = "REST"
     ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
     @staticmethod
