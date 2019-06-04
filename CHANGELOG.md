@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.8
+ * Add timezone to ZOQL AQuA export queries [#37](https://github.com/singer-io/tap-zuora/pull/37)
+
 ## 1.1.7
   * Use T delimited date format for ZOQL AQuA export queries [#35](https://github.com/singer-io/tap-zuora/pull/35)
 
