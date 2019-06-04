@@ -126,7 +126,7 @@ class Aqua:
             if bookmark == window_end:
                 query += " where {} = '{}'".format(replication_key, start_date)
             else:
-                query += " where {} >= '{}'".format(replication_key, start_date)
+                query += " where {} >= '{} (+00:00)'".format(replication_key, start_date)
                 if window_end:
                     query += " and {} <= '{}'".format(replication_key,
                                                       format_datetime_zoql(window_end, Aqua.ZOQL_DATE_FORMAT))
