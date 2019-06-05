@@ -73,6 +73,7 @@ def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disa
                                 .format(file_id)) from ex
             raise
         header = parse_header_line(next(lines), stream["tap_stream_id"])
+        extraction_time = singer.utils.now()
         for line in lines:
             if not line:
                 continue
@@ -100,11 +101,11 @@ def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disa
                 if bookmark and bookmark < start_date:
                     continue
 
-                singer.write_record(stream["tap_stream_id"], record)
+                singer.write_record(stream["tap_stream_id"], record, time_extracted=extraction_time)
                 state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = bookmark
                 singer.write_state(state)
             else:
-                singer.write_record(stream["tap_stream_id"], record)
+                singer.write_record(stream["tap_stream_id"], record, time_extracted=extraction_time)
 
             counter.increment()
 
