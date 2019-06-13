@@ -1,7 +1,7 @@
 import pendulum
 import singer
 from singer import metadata
-from client import ApiException
+from tap_zuora.client import ApiException
 
 
 MAX_EXPORT_DAYS = 30
