@@ -1,6 +1,7 @@
 import pendulum
 import singer
 from singer import metadata
+from tap_zuora.client import ApiException
 
 
 MAX_EXPORT_DAYS = 30
@@ -59,7 +60,7 @@ class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
     # Specifying incrementalTime requires this format, but ZOQL requires the 'T'
     PARAMETER_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
+    
     # Zuora's documentation describes some objects which are not supported for deleted
     # See https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
     # and https://github.com/singer-io/tap-zuora/pull/8 for more info.
@@ -301,7 +302,12 @@ class Rest:
             "Query": query,
             "Format": "csv"
         }
-        resp = client.rest_request("POST", endpoint, json=payload).json()
+
+        # With OAuth2, some entities that exist in Describe might not be available in the export
+        try:
+            resp = client.rest_request("POST", endpoint, json=payload).json()
+        except ApiException:
+            return "unavailable"
 
         if resp["Success"]:
             return "available"
