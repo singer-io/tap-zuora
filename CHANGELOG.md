@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.11
+ * Add http request metrics
+
+## 1.1.10
+ * TODO
+
 ## 1.1.9
  * Add `time_extracted` to record messages [commit](https://github.com/singer-io/tap-zuora/commit/91c602f488dddd07ef6d205dc3507fd7713e5f05)
 
