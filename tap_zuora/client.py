@@ -1,7 +1,6 @@
 import requests
-
 import singer
-
+from singer import metrics
 
 IS_AQUA = False
 IS_REST = True
@@ -77,9 +76,11 @@ class Client:
         return resp
 
     def aqua_request(self, method, url, **kwargs):
-        url = self.get_url(url, rest=False)
-        return self._request(method, url, auth=self.aqua_auth, **kwargs)
+        with metrics.http_request_timer(url):
+            url = self.get_url(url, rest=False)
+            return self._request(method, url, auth=self.aqua_auth, **kwargs)
 
     def rest_request(self, method, url, **kwargs):
-        url = self.get_url(url, rest=True)
-        return self._request(method, url, headers=self.rest_headers, **kwargs)
+        with metrics.http_request_timer(url):
+            url = self.get_url(url, rest=True)
+            return self._request(method, url, headers=self.rest_headers, **kwargs)

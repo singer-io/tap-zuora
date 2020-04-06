@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.11
+ * Add http request metrics
+
+## 1.1.10
+ * TODO
+
+## 1.1.9
+ * Add `time_extracted` to record messages [commit](https://github.com/singer-io/tap-zuora/commit/91c602f488dddd07ef6d205dc3507fd7713e5f05)
+
+## 1.1.8
+ * Add timezone to ZOQL AQuA export queries [#37](https://github.com/singer-io/tap-zuora/pull/37)
+
+## 1.1.7
+  * Use T delimited date format for ZOQL AQuA export queries [#35](https://github.com/singer-io/tap-zuora/pull/35)
+
 ## 1.1.6
   * Detect non-rectangular CSV exports and error if found [#33](https://github.com/singer-io/tap-zuora/pull/33)
 
