@@ -80,8 +80,10 @@ class Aqua:
 
     @staticmethod
     def make_payload(stream_name, project, query, partner_id, deleted=False):
+        # NB - 4/5/19 - Were told by zuora support to use the same value
+        # for both project and name to imply an incremental export
         rtn = {
-            "name": stream_name,
+            "name": project,
             "partner": partner_id,
             "project": project,
             "format": "csv",
@@ -144,13 +146,21 @@ class Aqua:
         deleted = Aqua.deleted_records_available(stream)
         payload = Aqua.make_payload(stream_name, project, query, partner_id, deleted)
 
-        if stream.get("replication_key"):
-            # Incremental time must be in Pacific time
-            # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/e_Post_Query_with_Retrieval_Time#Request_Parameters
-            start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
-            inc_pen = pendulum.parse(start_date)
-            inc_pen = inc_pen.astimezone(pendulum.timezone("America/Los_Angeles"))
-            payload["incrementalTime"] = inc_pen.strftime(Aqua.PARAMETER_DATE_FORMAT)
+        # NB - 4/5/19 - We used to include incrementalTime parameter in
+        # the payload, but we started seeing truncated csv files. We were
+        # told by zuora support that including the incrementalTime in the
+        # payload is redundant since it is already included as a `where`
+        # clause in the query and incremental is implied if the
+        # project/name are the same.
+
+        # if stream.get("replication_key"): # Incremental time must be in
+        # Pacific time #
+        # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/
+        # B_Submit_Query/e_Post_Query_with_Retrieval_Time#Request_Parameters
+        # start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
+        # inc_pen = pendulum.parse(start_date)
+        # inc_pen = inc_pen.astimezone(pendulum.timezone("America/Los_Angeles"))
+        # payload["incrementalTime"] = inc_pen.strftime(Aqua.ZOQL_DATE_FORMAT)
 
         return payload
 
