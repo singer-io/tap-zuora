@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.12
+  * Remove `incremental_time` from aqua queries [#34](https://github.com/singer-io/tap-zuora/pull/34)
+
 ## 1.1.11
  * Add http request metrics
 
