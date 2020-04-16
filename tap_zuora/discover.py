@@ -98,6 +98,9 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
     properties = {}
     mdata = metadata.new()
 
+    # Include entry with no breadcrumbs, required for PPW
+    metadata.write(mdata, (), 'table-key-properties', ["Id"])
+
     for field_name, props in field_dict.items():
         field_properties = {}
 
