@@ -1,7 +1,7 @@
 # tap-zuora
 Tap for Zuora
 
-# running
+# instructions
 
 ```
 pip install -e .
@@ -14,7 +14,7 @@ Write config into new file config.json:
 {
     "username": "<username>",
     "password": "<password>",
-    "api_type": "REST", # or AQUA
+    "api_type": "AQUA", # or REST
     "start_date": "2020-04-01",
     "sandbox": "false",
     "european": "true",
@@ -22,13 +22,11 @@ Write config into new file config.json:
 }
 ```
 
-Run discovery mode
+Run discovery mode in order to view the schema
 
 ```
 tap-zuora -c config.json --discover > catalog.json
 ```
-
-The resulting catalog of the rest api and of the aqua api are included in the repo as `catalog_aqua.json` or `catalog_rest.json`
 
 Copy or edit the catalog json file and mark some streams and fields as being selected:
 
