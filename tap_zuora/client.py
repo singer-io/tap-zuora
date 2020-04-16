@@ -12,12 +12,12 @@ IS_EURO = True
 URLS = {
     (IS_AQUA, IS_PROD, NOT_EURO): "https://www.zuora.com/",
     (IS_AQUA, IS_SAND, NOT_EURO): "https://apisandbox.zuora.com/",
-    (IS_AQUA, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
-    (IS_AQUA, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
+    (IS_AQUA, IS_PROD, IS_EURO): "https://rest.eu.zuora.com/",
+    (IS_AQUA, IS_SAND, IS_EURO): "https://rest.sandbox.eu.zuora.com/",
     (IS_REST, IS_PROD, NOT_EURO): "https://rest.zuora.com/",
     (IS_REST, IS_SAND, NOT_EURO): "https://rest.apisandbox.zuora.com/",
-    (IS_REST, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
-    (IS_REST, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
+    (IS_REST, IS_PROD, IS_EURO): "https://rest.eu.zuora.com/",
+    (IS_REST, IS_SAND, IS_EURO): "https://rest.sandbox.eu.zuora.com/",
 }
 
 LATEST_WSDL_VERSION = "91.0"
@@ -31,6 +31,7 @@ class ApiException(Exception):
         super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
 
 
+# pylint: disable=too-many-arguments
 class Client:
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
         self.username = username
