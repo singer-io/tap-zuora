@@ -3,6 +3,8 @@ Tap for Zuora
 
 # instructions
 
+Make a virtualenv and install this tap:
+
 ```
 pip install -e .
 ```
@@ -22,7 +24,7 @@ Write config into new file config.json:
 }
 ```
 
-Run discovery mode in order to view the schema
+Run discovery mode in order to obtain the schema with everything that can be exported:
 
 ```
 tap-zuora -c config.json --discover > catalog.json
@@ -46,6 +48,8 @@ Copy or edit the catalog json file and mark some streams and fields as being sel
 ```
 "selected": "true"
 ```
+
+Save the modified file as e.g. `catalog_aqua_selection.json` to use when running the sync in the next step.
 
 Run the tap:
 
