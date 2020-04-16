@@ -1,5 +1,12 @@
-# tap-zuora
-Tap for Zuora
+# pipelinewise-tap-zuora
+
+[![PyPI version](https://badge.fury.io/py/pipelinewise-tap-zuora.svg)](https://badge.fury.io/py/pipelinewise-tap-zuora)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-zuora.svg)](https://pypi.org/project/pipelinewise-tap-zuora/)
+[![License: MIT](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
+
+[Singer](https://www.singer.io/) tap that extracts data from the [Zuora API](https://www.zuora.com/) and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
+
+This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
 # instructions
 
@@ -30,25 +37,6 @@ Run discovery mode in order to obtain the schema with everything that can be exp
 tap-zuora -c config.json --discover > catalog.json
 ```
 
-Copy or edit the catalog json file and mark some streams and fields as being selected:
-
-- Add this entry in the metadata list of a stream to select it
-
-```
-{
-    "breadcrumb": [],
-    "metadata": {
-        "selected": "true"
-    }
-},
-```
-
-- Add this to other entries in the metadata of a stream (those with breadcrums):
-
-```
-"selected": "true"
-```
-
 Save the modified file as e.g. `catalog_aqua_selection.json` to use when running the sync in the next step.
 
 Run the tap:
@@ -59,4 +47,4 @@ tap-zuora -c config.json --catalog catalog_aqua_selection.json
 
 ---
 
-Copyright &copy; 2017 Stitch
+Based on Stitch documentation

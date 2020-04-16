@@ -1,47 +1,33 @@
 version: 2
+
+references:
+  container_config: &container_config
+    docker:
+      # Main Python container
+      - image: circleci/python:3.6.2
+
 jobs:
   build:
-    docker:
-      - image: 218546966473.dkr.ecr.us-east-1.amazonaws.com/circle-ci:tap-tester
+    <<: *container_config
+
     steps:
       - checkout
       - run:
-          name: 'Setup virtual env'
+          name: 'Setup virtual environment'
           command: |
-            virtualenv -p python3 /usr/local/share/virtualenvs/tap-zuora
-            source /usr/local/share/virtualenvs/tap-zuora/bin/activate
-            pip install .[dev]
+            python3 -m venv ./virtualenvs/tap-zuora
+            . ./virtualenvs/tap-zuora/bin/activate
+            pip install --upgrade pip
+            pip install -e .[test]
+
       - run:
-          name: 'pylint'
+          name: 'Pylinting'
           command: |
-            source /usr/local/share/virtualenvs/tap-zuora/bin/activate
-            pylint tap_zuora -d missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return,unused-argument
-      - add_ssh_keys
-      - run:
-          name: 'Integration Tests'
-          command: |
-            aws s3 cp s3://com-stitchdata-dev-deployment-assets/environments/tap-tester/sandbox dev_env.sh
-            source dev_env.sh
-            source /usr/local/share/virtualenvs/tap-tester/bin/activate
-            run-a-test --tap=tap-zuora \
-                       --target=target-stitch \
-                       --orchestrator=stitch-orchestrator \
-                       --email=harrison+sandboxtest@stitchdata.com \
-                       --password=$SANDBOX_PASSWORD \
-                       --client-id=50 \
-                       tap_tester_zuora
+            . ./virtualenvs/tap-postgres/bin/activate
+            pylint --rcfile .pylintrc tap_zuora
+
 workflows:
   version: 2
-  commit:
-    jobs:
-      - build
-  build_daily:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
+  build:
     jobs:
       - build
