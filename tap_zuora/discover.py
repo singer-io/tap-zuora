@@ -98,6 +98,9 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
     properties = {}
     mdata = metadata.new()
 
+    # Include entry with no breadcrumbs, required for PPW
+    metadata.write(mdata, (), 'table-key-properties', ["Id"])
+
     for field_name, props in field_dict.items():
         field_properties = {}
 
@@ -118,7 +121,10 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         if field_name in REQUIRED_KEYS:
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
         elif props["supported"]:
-            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
+            # PPW can not perform its own selection, but relies on the tap default settings.
+            # So for now, include all the supported fields instead of leaving the choice to the user
+            # mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
+            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
         else:
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'unsupported')
 
