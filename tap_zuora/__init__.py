@@ -7,7 +7,7 @@ import singer
 from singer import metadata
 from tap_zuora.client import Client
 from tap_zuora.discover import discover_streams
-from tap_zuora.sync import sync_stream
+from tap_zuora.sync import sync_stream  # pylint: disable=no-name-in-module,import-error
 
 
 REQUIRED_CONFIG_KEYS = [

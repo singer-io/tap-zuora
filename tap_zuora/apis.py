@@ -24,7 +24,7 @@ APIS = {
 
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
-    fields = [f for f, s in stream["schema"]["properties"].items()
+    fields = [f for f in stream["schema"]["properties"].keys()
               if metadata.get(mdata, ('properties', f), 'selected')
               or metadata.get(mdata, ('properties', f), 'inclusion') == 'automatic']
 
@@ -51,10 +51,12 @@ def format_datetime_zoql(datetime_str, date_format):
 class ExportFailed(Exception):
     pass
 
+# pylint: disable=missing-super-argument
 class ExportTimedOut(ExportFailed):
     def __init__(self, timeout, unit):
         super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
 
+# pylint: disable=no-init
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
     # Specifying incrementalTime requires this format, but ZOQL requires the 'T'
@@ -108,11 +110,14 @@ class Aqua:
     @staticmethod
     def deleted_records_available(stream):
         if stream['tap_stream_id'] in Aqua.DOES_NOT_SUPPORT_DELETED:
-            LOGGER.info("Deleted fields are not supported for stream - %s. Not selecting deleted records.", stream['tap_stream_id'])
+            LOGGER.info("Deleted fields are not supported for stream - %s. Not selecting deleted records.",
+                        stream['tap_stream_id'])
             return False
 
         mdata = metadata.to_map(stream['metadata'])
-        return "Deleted" in stream["schema"]["properties"] and metadata.get(mdata, ('properties', 'Deleted'), 'selected')
+        return "Deleted" in stream["schema"]["properties"] and metadata.get(mdata,
+                                                                            ('properties', 'Deleted'),
+                                                                            'selected')
 
     @staticmethod
     def get_query(state, stream):

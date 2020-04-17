@@ -2,12 +2,20 @@
 
 from setuptools import setup
 
-setup(name='tap-zuora',
-      version='1.1.12',
-      description='Singer.io tap for extracting data from the Zuora API',
+with open('README.md') as f:
+    long_description = f.read()
+
+setup(name='pipelinewise-tap-zuora',
+      version='1.0.0',
+      description='Singer.io tap for extracting data from the Zuora API - PipelineWise compatible',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       author='Stitch',
-      url='https://singer.io',
-      classifiers=['Programming Language :: Python :: 3 :: Only'],
+      url='https://github.com/transferwise/pipelinewise-tap-zuora',
+      classifiers=[
+          'License :: OSI Approved :: GNU Affero General Public License v3',
+          'Programming Language :: Python :: 3 :: Only'
+      ],
       py_modules=['tap_zuora'],
       install_requires=[
           'singer-python==5.1.1',

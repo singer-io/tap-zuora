@@ -103,8 +103,8 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
 
         if props.get("joined", False):
             split_field_name = field_name.split(".")
-            field_name = field_name.replace(".","")
-            mdata=metadata.write(mdata, ('properties', field_name), 'tap-zuora.joined_object', split_field_name[0])
+            field_name = field_name.replace(".", "")
+            mdata = metadata.write(mdata, ('properties', field_name), 'tap-zuora.joined_object', split_field_name[0])
 
         if props["type"] in ["date", "datetime"]:
             field_properties["type"] = "string"
