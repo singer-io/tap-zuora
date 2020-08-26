@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0
+  * Syncs soft deleted records [#48](https://github.com/singer-io/tap-zuora/pull/48)
+
 ## 1.1.12
   * Remove `incremental_time` from aqua queries [#34](https://github.com/singer-io/tap-zuora/pull/34)
 
