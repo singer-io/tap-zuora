@@ -122,7 +122,6 @@ class Aqua:
         query = "select {} from {}".format(fields, stream["tap_stream_id"])
         if stream.get("replication_key"):
             replication_key = stream["replication_key"]
-            bookmark = state["bookmarks"][stream["tap_stream_id"]][replication_key]
             query += " order by {} asc".format(replication_key)
 
         LOGGER.info("Executing query: %s", query)
