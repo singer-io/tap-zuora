@@ -17,7 +17,7 @@ setup(name='tap-zuora',
       extras_require={
           'dev': [
               'ipdb',
-              'pylint'
+              'pylint==2.5.3'
           ]
       },
       entry_points='''
