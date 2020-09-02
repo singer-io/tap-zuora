@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+  * Fixed REST queries to use iso-8601 timestamp [#50](https://github.com/singer-io/tap-zuora/pull/50)
+
 ## 1.2.0
   * Syncs soft deleted records [#48](https://github.com/singer-io/tap-zuora/pull/48)
 
