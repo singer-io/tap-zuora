@@ -180,10 +180,23 @@ class Aqua:
 
     @staticmethod
     def stream_status(client, stream_name):
+        """
+        Check if the provided Zuora object (stream_name) can be queried via
+        AQuA API by issuing a small export job of 1 row. This job must be
+        cleaned up after submission to limit concurrent jobs during
+        discovery.
+
+        The response from submitting the job indicates whether or not the
+        object is available.
+        """
         endpoint = "{}/batch-query/".format(Aqua.get_url(client))
         query = "select * from {} limit 1".format(stream_name)
         payload = Aqua.make_payload(stream_name, "discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
+
+        # Cancel this job to keep concurrency low.
+        client.aqua_request("DELETE", "{}/batch-query/jobs/{}".format(Aqua.get_url(client),
+                                                                      resp['id']))
         if "message" in resp:
             if resp["message"] == SYNTAX_ERROR:
                 return "unavailable"

@@ -1,3 +1,4 @@
+import backoff
 import requests
 import singer
 from singer import metrics
@@ -24,6 +25,10 @@ LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
 
+class RateLimitException(Exception):
+    def __init__(self, resp):
+        self.resp = resp
+        super(RateLimitException, self).__init__("Rate Limit Exceeded (429) - {}".format(self.resp.content))
 
 class ApiException(Exception):
     def __init__(self, resp):
@@ -70,11 +75,20 @@ class Client:
         req = requests.Request(method, url, **kwargs).prepare()
         LOGGER.info("%s: %s", method, req.url)
         resp = self._session.send(req, stream=stream)
+        if resp.status_code == 429:
+            raise RateLimitException(resp)
         if resp.status_code != 200:
             raise ApiException(resp)
 
         return resp
 
+    # NB> Backoff as recommended by Zuora here:
+    # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
+    @backoff.on_exception(backoff.expo,
+                          RateLimitException,
+                          max_time=5 * 60, # in seconds
+                          factor=30,
+                          jitter=None)
     def aqua_request(self, method, url, **kwargs):
         with metrics.http_request_timer(url):
             url = self.get_url(url, rest=False)
