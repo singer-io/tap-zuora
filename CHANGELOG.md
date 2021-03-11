@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+  * Delete AQuA API discovery exports when they are no longer needed, to reduce concurrency of jobs. [#53](https://github.com/singer-io/tap-zuora/pull/53)
+  * Add exponential backoff to AQuA requests for 429 errors [#53](https://github.com/singer-io/tap-zuora/pull/53)
+
 ## 1.2.1
   * Fixed REST queries to use iso-8601 timestamp [#50](https://github.com/singer-io/tap-zuora/pull/50)
 
