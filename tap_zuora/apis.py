@@ -128,7 +128,7 @@ class Aqua:
         return query
 
     @staticmethod
-    def get_payload(state, stream, partner_id):
+    def get_payload(state, stream, partner_id, is_european):
         stream_name = stream["tap_stream_id"]
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
         project = "{}_{}".format(stream_name, version)
@@ -141,7 +141,12 @@ class Aqua:
             # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/e_Post_Query_with_Retrieval_Time#Request_Parameters
             start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
             inc_pen = pendulum.parse(start_date)
-            inc_pen = inc_pen.astimezone(pendulum.timezone("US/Pacific"))
+
+            if is_european:
+                inc_pen = inc_pen.astimezone(pendulum.timezone("UTC"))
+            else:
+                inc_pen = inc_pen.astimezone(pendulum.timezone("US/Pacific"))
+
             payload["incrementalTime"] = inc_pen.strftime(Aqua.PARAMETER_DATE_FORMAT)
 
         return payload
@@ -157,7 +162,7 @@ class Aqua:
         # means that we're never executing a full export which means we
         # can't establish a baseline to report deletes on.
         # https://stitchdata.atlassian.net/browse/SRCE-322
-        payload = Aqua.get_payload(state, stream, client.partner_id)
+        payload = Aqua.get_payload(state, stream, client.partner_id, client.european)
         # Log to show whether the aqua request should trigger a full or
         # incremental response based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
