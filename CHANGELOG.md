@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.3
+  * Handle non-rectangular CSV files by getting a new stateful AQuA session on the next sync [#54](https://github.com/singer-io/tap-zuora/pull/54)
+
 ## 1.2.2
   * Delete AQuA API discovery exports when they are no longer needed, to reduce concurrency of jobs. [#53](https://github.com/singer-io/tap-zuora/pull/53)
   * Add exponential backoff to AQuA requests for 429 errors [#53](https://github.com/singer-io/tap-zuora/pull/53)
