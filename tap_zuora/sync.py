@@ -47,6 +47,13 @@ def poll_job_until_done(job_id, client, api):
 def clear_file_ids(state, stream):
     state["bookmarks"][stream["tap_stream_id"]].pop("file_ids", None)
     singer.write_state(state)
+    return state
+
+
+def clear_stateful_session(state, stream):
+    state["bookmarks"][stream["tap_stream_id"]]["version"] = int(time.time())
+    singer.write_state(state)
+    return state
 
 def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disable=too-many-branches
     if stream.get("replication_key"):
@@ -80,10 +87,11 @@ def sync_file_ids(file_ids, client, state, stream, api, counter): # pylint: disa
 
             parsed_line = parse_csv_line(line)
             if len(header) != len(parsed_line):
-                clear_file_ids(state, stream)
+                state = clear_file_ids(state, stream)
+                state = clear_stateful_session(state, stream)
                 raise Exception(("Detected that File ID {} is non-rectangular. Found row "
                                  "with {} entries, expected {} entries from header line. "
-                                 "Will resume from bookmark on next extraction.")
+                                 "Will resume from bookmark with new AQuA session on next extraction.")
                                 .format(file_id, len(parsed_line), len(header)))
 
             row = dict(zip(header, parsed_line))
