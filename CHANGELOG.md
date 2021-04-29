@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.4
+  * Change datetimes in REST queries to explicitly use UTC [#56](https://github.com/singer-io/tap-zuora/pull/56)
+
 ## 1.2.3
   * Handle non-rectangular CSV files by getting a new stateful AQuA session on the next sync [#54](https://github.com/singer-io/tap-zuora/pull/54)
 
