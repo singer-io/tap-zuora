@@ -236,7 +236,7 @@ class Aqua:
 
 
 class Rest:
-    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
     @staticmethod
     def make_payload(query):
@@ -255,8 +255,8 @@ class Rest:
         if stream.get("replication_key") and start_date and end_date:
             start_date = format_datetime_zoql(start_date, Rest.ZOQL_DATE_FORMAT)
             end_date = format_datetime_zoql(end_date, Rest.ZOQL_DATE_FORMAT)
-            query += " where {} >= '{}Z'".format(stream["replication_key"], start_date)
-            query += " and {} < '{}Z'".format(stream["replication_key"], end_date)
+            query += " where {} >= '{}'".format(stream["replication_key"], start_date)
+            query += " and {} < '{}'".format(stream["replication_key"], end_date)
 
         LOGGER.info("Executing query: %s", query)
         return query
