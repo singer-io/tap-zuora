@@ -236,7 +236,7 @@ class Aqua:
 
 
 class Rest:
-    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+    ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
     @staticmethod
     def make_payload(query):
