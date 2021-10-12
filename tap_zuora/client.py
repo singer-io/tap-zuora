@@ -38,7 +38,7 @@ class ApiException(Exception):
         super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
 
 
-class Client:
+class Client:# pylint: disable=too-many-instance-attributes
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
         self.username = username
         self.password = password
@@ -64,7 +64,7 @@ class Client:
         potential_urls = URLS[(rest, self.sandbox, self.european)]
         stream_name = "Account"
         for url_prefix in potential_urls:
-            if rest==True:
+            if rest:
                 resp = requests.get("{}v1/describe/{}".format(url_prefix, stream_name),headers=self.rest_headers)
             else:
                 query = "select * from {} limit 1".format(stream_name)
@@ -77,7 +77,8 @@ class Client:
                     delete_url = "{}v1/batch-query/jobs/{}".format(url_prefix, delete_id)
                     requests.delete(delete_url, auth=self.aqua_auth)
             #if resp.status_code == 401: continue
-            if resp.status_code == 401: continue
+            if resp.status_code == 401:
+                continue
             return url_prefix
         raise Exception
 
