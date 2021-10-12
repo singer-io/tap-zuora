@@ -13,7 +13,7 @@ IS_EURO = True
 
 URLS = {
     (IS_AQUA, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/","https://rest.zuora.com/"], # Do we need to try na.zuora.com here? rest.na.zuora.com?
-    (IS_AQUA, IS_SAND, NOT_EURO): ["https://apisandbox.zuora.com/"], # same - Pending support ticket
+    (IS_AQUA, IS_SAND, NOT_EURO): ["https://rest.apisandbox.zuora.com/"],#["https://apisandbox.zuora.com/"], # same - Pending support ticket
     (IS_AQUA, IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
     (IS_AQUA, IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"],
     (IS_REST, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/", "https://rest.zuora.com/"],
