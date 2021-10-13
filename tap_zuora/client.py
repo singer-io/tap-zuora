@@ -12,12 +12,12 @@ NOT_EURO = False
 IS_EURO = True
 
 URLS = {
-    (IS_AQUA, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/","https://rest.zuora.com/"], # Do we need to try na.zuora.com here? rest.na.zuora.com?
-    (IS_AQUA, IS_SAND, NOT_EURO): ["https://rest.apisandbox.zuora.com/"],#["https://apisandbox.zuora.com/"], # same - Pending support ticket
+    (IS_AQUA, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/","https://rest.zuora.com/"],
+    (IS_AQUA, IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
     (IS_AQUA, IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
     (IS_AQUA, IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"],
     (IS_REST, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/", "https://rest.zuora.com/"],
-    (IS_REST, IS_SAND, NOT_EURO): ["https://rest.apisandbox.zuora.com/","https://rest.sandbox.na.zuora.com/"],
+    (IS_REST, IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
     (IS_REST, IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
     (IS_REST, IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"]
 }
@@ -76,11 +76,15 @@ class Client:# pylint: disable=too-many-instance-attributes
                     delete_id = resp_json['id']
                     delete_url = "{}v1/batch-query/jobs/{}".format(url_prefix, delete_id)
                     requests.delete(delete_url, auth=self.aqua_auth)
-            #if resp.status_code == 401: continue
             if resp.status_code == 401:
                 continue
+            resp.raise_for_status()
             return url_prefix
-        raise Exception
+        raise Exception("Could not discover {} {} {} data center url out of {}"
+                        .format("EU-based" if self.european else "US-based",
+                                "REST" if rest else "AQuA",
+                                "Sandbox" if self.sandbox else "Production",
+                                potential_urls))
 
     @property
     def aqua_auth(self):
