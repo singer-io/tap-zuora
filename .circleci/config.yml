@@ -9,9 +9,11 @@ jobs:
           name: 'Setup virtual env'
           command: |
             pyenv global 3.8.10
+            # we switch to 3.8.10 to install the venv because the tap is incompatible with python 3.9+ xml module
             python3 -m venv /usr/local/share/virtualenvs/tap-zuora
             source /usr/local/share/virtualenvs/tap-zuora/bin/activate
             pip install .[dev]
+            pyenv global 3.9.6
       - run:
           name: 'pylint'
           command: |
