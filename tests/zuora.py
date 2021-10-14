@@ -4,6 +4,8 @@ import tap_tester.menagerie   as menagerie
 import tap_tester.runner      as runner
 from functools import reduce
 import unittest
+from singer import utils
+from datetime import timedelta
 
 class Zuora(unittest.TestCase):
 
@@ -44,7 +46,7 @@ class Zuora(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : '2017-01-05T00:00:00Z',
+            'start_date' : '2017-01-05T00:00:00Z' if self.api_type == "AQUA" else utils.now() - timedelta(days=30),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
             'api_type' : self.api_type,
             'sandbox' : 'true'
@@ -87,7 +89,8 @@ class Zuora(unittest.TestCase):
         our_catalogs = [c for c in found_catalogs if c.get('tap_stream_id') in self.expected_sync_streams()]
         for catalog in our_catalogs:
             schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
-            connections.select_catalog_and_fields_via_metadata(conn_id, catalog, schema, [], [])
+            non_selected_fields = ['SequenceSetId'] if api_type=='REST' else []
+            connections.select_catalog_and_fields_via_metadata(conn_id, catalog, schema, [], non_selected_fields)
 
         # Clear State and run sync
         menagerie.set_state(conn_id, {})
@@ -103,7 +106,7 @@ class Zuora(unittest.TestCase):
         self.assertGreater(replicated_row_count, 0, msg="failed to replicate any data: {}".format(record_count_by_stream))
         print("total replicated row count: {}".format(replicated_row_count))
 
-        # We should retreive an account that was created on 1/25/2018
+        # We should receive at least 1 account greater than start_date and bookmark on it
         account_bm = menagerie.get_state(conn_id)["bookmarks"]["Account"]["UpdatedDate"]
         start_date = self.get_properties()["start_date"]
         self.assertTrue(account_bm > start_date)
