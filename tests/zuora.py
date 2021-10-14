@@ -46,7 +46,7 @@ class Zuora(unittest.TestCase):
         return {
             'start_date' : '2017-01-05T00:00:00Z',
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
-            'api_type' : 'AQUA',
+            'api_type' : self.api_type,
             'sandbox' : 'true'
         }
 
@@ -60,6 +60,12 @@ class Zuora(unittest.TestCase):
                 'replication_key'    : catalog.get('replication_key')}
 
     def test_run(self):
+        for api_type in ['AQUA', 'REST']:
+            with self.subTest(api_type=api_type):
+                self.test_api(api_type)
+
+    def test_api(self, api_type):
+        self.api_type = api_type
         conn_id = connections.ensure_connection(self)
 
         # Run the tap in check mode
