@@ -89,6 +89,7 @@ class Zuora(unittest.TestCase):
         our_catalogs = [c for c in found_catalogs if c.get('tap_stream_id') in self.expected_sync_streams()]
         for catalog in our_catalogs:
             schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
+            # BUG TDL-15828 - Remove non_selected_fields when discovery no longer returns them for REST
             non_selected_fields = ['SequenceSetId'] if api_type=='REST' else []
             connections.select_catalog_and_fields_via_metadata(conn_id, catalog, schema, [], non_selected_fields)
 
