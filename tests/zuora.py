@@ -62,9 +62,9 @@ class Zuora(unittest.TestCase):
     def test_run(self):
         for api_type in ['AQUA', 'REST']:
             with self.subTest(api_type=api_type):
-                self.test_api(api_type)
+                self.run_for_api(api_type)
 
-    def test_api(self, api_type):
+    def run_for_api(self, api_type):
         self.api_type = api_type
         conn_id = connections.ensure_connection(self)
 
