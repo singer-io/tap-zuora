@@ -12,14 +12,10 @@ NOT_EURO = False
 IS_EURO = True
 
 URLS = {
-    (IS_AQUA, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/","https://rest.zuora.com/"],
-    (IS_AQUA, IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
-    (IS_AQUA, IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
-    (IS_AQUA, IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"],
-    (IS_REST, IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/", "https://rest.zuora.com/"],
-    (IS_REST, IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
-    (IS_REST, IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
-    (IS_REST, IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"]
+    (IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/", "https://rest.zuora.com/"],
+    (IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
+    (IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
+    (IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"],
 }
 
 
@@ -61,7 +57,7 @@ class Client:# pylint: disable=too-many-instance-attributes
         return Client(config['username'], config['password'], partner_id, sandbox, european)
 
     def get_url(self, rest):
-        potential_urls = URLS[(rest, self.sandbox, self.european)]
+        potential_urls = URLS[(self.sandbox, self.european)]
         stream_name = "Account"
         for url_prefix in potential_urls:
             if rest:
