@@ -5,7 +5,7 @@ import tap_tester.runner      as runner
 from functools import reduce
 import unittest
 from singer import utils
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 class Zuora(unittest.TestCase):
 
@@ -46,7 +46,9 @@ class Zuora(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : '2017-01-05T00:00:00Z' if self.api_type == "AQUA" else utils.strftime(utils.now() - timedelta(days=30)),
+            'start_date' : ('2017-01-05T00:00:00Z'
+                            if self.api_type == "AQUA"
+                            else datetime.strftime(utils.now() - timedelta(days=30), "%Y-%m-%dT00:00:00Z")),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
             'api_type' : self.api_type,
             'sandbox' : 'true'
