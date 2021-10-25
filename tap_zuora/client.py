@@ -63,17 +63,17 @@ class Client:# pylint: disable=too-many-instance-attributes
         stream_name = "Account"
         for url_prefix in potential_urls:
             if rest:
-                resp = self._request("GET","{}v1/describe/{}".format(url_prefix, stream_name),headers=self.rest_headers)
+                resp = self._retryable_request("GET","{}v1/describe/{}".format(url_prefix, stream_name), headers=self.rest_headers)
             else:
                 query = "select * from {} limit 1".format(stream_name)
                 post_url = "{}v1/batch-query/".format(url_prefix)
                 payload = Aqua.make_payload(stream_name, "discover", query, self.partner_id)
-                resp = self._request("POST", post_url, auth=self.aqua_auth, json=payload)
+                resp = self._retryable_request("POST", post_url, auth=self.aqua_auth, json=payload)
                 if resp.status_code==200:
                     resp_json = resp.json()
                     delete_id = resp_json['id']
                     delete_url = "{}v1/batch-query/jobs/{}".format(url_prefix, delete_id)
-                    self._request("DELETE", delete_url, auth=self.aqua_auth)
+                    self._retryable_request("DELETE", delete_url, auth=self.aqua_auth)
             if resp.status_code == 401:
                 continue
             resp.raise_for_status()
@@ -104,14 +104,20 @@ class Client:# pylint: disable=too-many-instance-attributes
                           max_time=5 * 60, # in seconds
                           factor=30,
                           jitter=None)
-    def _request(self, method, url, stream=False, **kwargs):
+    def _retryable_request(self, method, url, stream=False, **kwargs):
         req = requests.Request(method, url, **kwargs).prepare()
-        LOGGER.info("%s: %s", method, req.url)
         resp = self._session.send(req, stream=stream)
+
         if resp.status_code == 429:
             raise RateLimitException(resp)
         if resp.status_code == 500:
             raise RetryableException(resp)
+        return resp
+
+    def _request(self, method, url, **kwargs):
+        LOGGER.info("%s: %s", method, req.url)
+        resp = self._retryable_request(method, url, **kwargs)
+
         if resp.status_code != 200:
             raise ApiException(resp)
 
