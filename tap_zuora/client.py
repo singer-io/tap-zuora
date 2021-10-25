@@ -115,7 +115,7 @@ class Client:# pylint: disable=too-many-instance-attributes
         return resp
 
     def _request(self, method, url, **kwargs):
-        LOGGER.info("%s: %s", method, req.url)
+        LOGGER.info("%s: %s", method, url)
         resp = self._retryable_request(method, url, **kwargs)
 
         if resp.status_code != 200:
