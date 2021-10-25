@@ -34,8 +34,7 @@ class ApiException(Exception):
         super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
 
 class RetryableException(ApiException):
-    def __init__(self, resp):
-        super(RetryableException, self).__init__(resp)
+    """Class to mark an ApiException as retryable."""
 
 class Client:# pylint: disable=too-many-instance-attributes
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
