@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.1
+  * Mark all HTTP responses with a 500 status code as retryable. [#59](https://github.com/singer-io/tap-zuora/pull/59)
+
 ## 1.3.0
   * Support endpoints for Zuora data centers that were initialized after September 2020 [#58](https://github.com/singer-io/tap-zuora/pull/58)
 

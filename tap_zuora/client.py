@@ -33,6 +33,8 @@ class ApiException(Exception):
         self.resp = resp
         super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
 
+class RetryableException(ApiException):
+    """Class to mark an ApiException as retryable."""
 
 class Client:# pylint: disable=too-many-instance-attributes
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
@@ -61,17 +63,17 @@ class Client:# pylint: disable=too-many-instance-attributes
         stream_name = "Account"
         for url_prefix in potential_urls:
             if rest:
-                resp = requests.get("{}v1/describe/{}".format(url_prefix, stream_name),headers=self.rest_headers)
+                resp = self._retryable_request("GET","{}v1/describe/{}".format(url_prefix, stream_name), headers=self.rest_headers)
             else:
                 query = "select * from {} limit 1".format(stream_name)
                 post_url = "{}v1/batch-query/".format(url_prefix)
                 payload = Aqua.make_payload(stream_name, "discover", query, self.partner_id)
-                resp = requests.post(post_url, auth=self.aqua_auth, json=payload)
+                resp = self._retryable_request("POST", post_url, auth=self.aqua_auth, json=payload)
                 if resp.status_code==200:
                     resp_json = resp.json()
                     delete_id = resp_json['id']
                     delete_url = "{}v1/batch-query/jobs/{}".format(url_prefix, delete_id)
-                    requests.delete(delete_url, auth=self.aqua_auth)
+                    self._retryable_request("DELETE", delete_url, auth=self.aqua_auth)
             if resp.status_code == 401:
                 continue
             resp.raise_for_status()
@@ -95,24 +97,32 @@ class Client:# pylint: disable=too-many-instance-attributes
             'Content-Type': 'application/json',
         }
 
-    def _request(self, method, url, stream=False, **kwargs):
+    # NB> Backoff as recommended by Zuora here:
+    # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
+    @backoff.on_exception(backoff.expo,
+                          (RateLimitException, RetryableException),
+                          max_time=5 * 60, # in seconds
+                          factor=30,
+                          jitter=None)
+    def _retryable_request(self, method, url, stream=False, **kwargs):
         req = requests.Request(method, url, **kwargs).prepare()
-        LOGGER.info("%s: %s", method, req.url)
         resp = self._session.send(req, stream=stream)
+
         if resp.status_code == 429:
             raise RateLimitException(resp)
+        if resp.status_code == 500:
+            raise RetryableException(resp)
+        return resp
+
+    def _request(self, method, url, **kwargs):
+        LOGGER.info("%s: %s", method, url)
+        resp = self._retryable_request(method, url, **kwargs)
+
         if resp.status_code != 200:
             raise ApiException(resp)
 
         return resp
 
-    # NB> Backoff as recommended by Zuora here:
-    # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
-    @backoff.on_exception(backoff.expo,
-                          RateLimitException,
-                          max_time=5 * 60, # in seconds
-                          factor=30,
-                          jitter=None)
     def aqua_request(self, method, path, **kwargs):
         with metrics.http_request_timer(path):
             url = self.aqua_url+path
