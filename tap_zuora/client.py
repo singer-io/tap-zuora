@@ -21,7 +21,7 @@ URLS = {
     (IS_REST, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
 }
 
-LATEST_WSDL_VERSION = "110.0"
+LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
 
