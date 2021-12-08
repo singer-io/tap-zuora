@@ -1,7 +1,7 @@
 import pendulum
 import singer
 from singer import metadata
-from tap_zuora.client import ApiException
+from tap_zuora.client import ApiException # pylint: disable=cyclic-import
 
 MAX_EXPORT_DAYS = 30
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
