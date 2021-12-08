@@ -2,6 +2,7 @@ import backoff
 import requests
 import singer
 from singer import metrics
+from tap_zuora.apis import Aqua
 
 IS_AQUA = False
 IS_REST = True
@@ -11,15 +12,12 @@ NOT_EURO = False
 IS_EURO = True
 
 URLS = {
-    (IS_AQUA, IS_PROD, NOT_EURO): "https://www.zuora.com/",
-    (IS_AQUA, IS_SAND, NOT_EURO): "https://apisandbox.zuora.com/",
-    (IS_AQUA, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
-    (IS_AQUA, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
-    (IS_REST, IS_PROD, NOT_EURO): "https://rest.zuora.com/",
-    (IS_REST, IS_SAND, NOT_EURO): "https://rest.apisandbox.zuora.com/",
-    (IS_REST, IS_PROD, IS_EURO ): "https://rest.eu.zuora.com/",
-    (IS_REST, IS_SAND, IS_EURO ): "https://rest.sandbox.eu.zuora.com/",
+    (IS_PROD, NOT_EURO): ["https://rest.na.zuora.com/", "https://rest.zuora.com/"],
+    (IS_SAND, NOT_EURO): ["https://rest.sandbox.na.zuora.com/", "https://rest.apisandbox.zuora.com/"],
+    (IS_PROD, IS_EURO ): ["https://rest.eu.zuora.com/"],
+    (IS_SAND, IS_EURO ): ["https://rest.sandbox.eu.zuora.com/"],
 }
+
 
 LATEST_WSDL_VERSION = "91.0"
 
@@ -35,8 +33,10 @@ class ApiException(Exception):
         self.resp = resp
         super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
 
+class RetryableException(ApiException):
+    """Class to mark an ApiException as retryable."""
 
-class Client:
+class Client:# pylint: disable=too-many-instance-attributes
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
         self.username = username
         self.password = password
@@ -44,6 +44,9 @@ class Client:
         self.european = european
         self.partner_id = partner_id
         self._session = requests.Session()
+
+        self.rest_url = self.get_url(rest=True)
+        self.aqua_url = self.get_url(rest=False)
 
         adapter = requests.adapters.HTTPAdapter(max_retries=1) # Try again in the case the TCP socket closes
         self._session.mount('https://', adapter)
@@ -55,8 +58,31 @@ class Client:
         partner_id = config.get('partner_id', None)
         return Client(config['username'], config['password'], partner_id, sandbox, european)
 
-    def get_url(self, url, rest=False):
-        return URLS[(rest, self.sandbox, self.european)] + url
+    def get_url(self, rest):
+        potential_urls = URLS[(self.sandbox, self.european)]
+        stream_name = "Account"
+        for url_prefix in potential_urls:
+            if rest:
+                resp = self._retryable_request("GET","{}v1/describe/{}".format(url_prefix, stream_name), headers=self.rest_headers)
+            else:
+                query = "select * from {} limit 1".format(stream_name)
+                post_url = "{}v1/batch-query/".format(url_prefix)
+                payload = Aqua.make_payload(stream_name, "discover", query, self.partner_id)
+                resp = self._retryable_request("POST", post_url, auth=self.aqua_auth, json=payload)
+                if resp.status_code==200:
+                    resp_json = resp.json()
+                    delete_id = resp_json['id']
+                    delete_url = "{}v1/batch-query/jobs/{}".format(url_prefix, delete_id)
+                    self._retryable_request("DELETE", delete_url, auth=self.aqua_auth)
+            if resp.status_code == 401:
+                continue
+            resp.raise_for_status()
+            return url_prefix
+        raise Exception("Could not discover {} {} {} data center url out of {}"
+                        .format("EU-based" if self.european else "US-based",
+                                "REST" if rest else "AQuA",
+                                "Sandbox" if self.sandbox else "Production",
+                                potential_urls))
 
     @property
     def aqua_auth(self):
@@ -71,30 +97,38 @@ class Client:
             'Content-Type': 'application/json',
         }
 
-    def _request(self, method, url, stream=False, **kwargs):
+    # NB> Backoff as recommended by Zuora here:
+    # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
+    @backoff.on_exception(backoff.expo,
+                          (RateLimitException, RetryableException),
+                          max_time=5 * 60, # in seconds
+                          factor=30,
+                          jitter=None)
+    def _retryable_request(self, method, url, stream=False, **kwargs):
         req = requests.Request(method, url, **kwargs).prepare()
-        LOGGER.info("%s: %s", method, req.url)
         resp = self._session.send(req, stream=stream)
+
         if resp.status_code == 429:
             raise RateLimitException(resp)
+        if resp.status_code == 500:
+            raise RetryableException(resp)
+        return resp
+
+    def _request(self, method, url, **kwargs):
+        LOGGER.info("%s: %s", method, url)
+        resp = self._retryable_request(method, url, **kwargs)
+
         if resp.status_code != 200:
             raise ApiException(resp)
 
         return resp
 
-    # NB> Backoff as recommended by Zuora here:
-    # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
-    @backoff.on_exception(backoff.expo,
-                          RateLimitException,
-                          max_time=5 * 60, # in seconds
-                          factor=30,
-                          jitter=None)
-    def aqua_request(self, method, url, **kwargs):
-        with metrics.http_request_timer(url):
-            url = self.get_url(url, rest=False)
+    def aqua_request(self, method, path, **kwargs):
+        with metrics.http_request_timer(path):
+            url = self.aqua_url+path
             return self._request(method, url, auth=self.aqua_auth, **kwargs)
 
-    def rest_request(self, method, url, **kwargs):
-        with metrics.http_request_timer(url):
-            url = self.get_url(url, rest=True)
+    def rest_request(self, method, path, **kwargs):
+        with metrics.http_request_timer(path):
+            url = self.rest_url+path
             return self._request(method, url, headers=self.rest_headers, **kwargs)

@@ -10,18 +10,6 @@ NO_DELETED_SUPPORT = ("Objects included in the queries do not support the queryi
 
 LOGGER = singer.get_logger()
 
-IS_PROD = False
-IS_SAND = True
-NOT_EURO = False
-IS_EURO = True
-
-APIS = {
-    (IS_PROD, NOT_EURO): "apps/api",
-    (IS_PROD, IS_EURO): "v1",
-    (IS_SAND, NOT_EURO): "apps/api",
-    (IS_SAND, IS_EURO): "v1",
-}
-
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
     fields = [f for f, s in stream["schema"]["properties"].items()
@@ -147,12 +135,8 @@ class Aqua:
         return payload
 
     @staticmethod
-    def get_url(client):
-        return APIS[(client.sandbox, client.european)]
-
-    @staticmethod
     def create_job(client, state, stream):
-        endpoint = "{}/batch-query/".format(Aqua.get_url(client))
+        endpoint = "v1/batch-query/"
         # This _always_ submits with an incremental_time which I think
         # means that we're never executing a full export which means we
         # can't establish a baseline to report deletes on.
@@ -189,14 +173,13 @@ class Aqua:
         The response from submitting the job indicates whether or not the
         object is available.
         """
-        endpoint = "{}/batch-query/".format(Aqua.get_url(client))
+        endpoint = "v1/batch-query/"
         query = "select * from {} limit 1".format(stream_name)
         payload = Aqua.make_payload(stream_name, "discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
 
         # Cancel this job to keep concurrency low.
-        client.aqua_request("DELETE", "{}/batch-query/jobs/{}".format(Aqua.get_url(client),
-                                                                      resp['id']))
+        client.aqua_request("DELETE", "v1/batch-query/jobs/{}".format(resp['id']))
         if "message" in resp:
             if resp["message"] == SYNTAX_ERROR:
                 return "unavailable"
@@ -210,7 +193,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def job_ready(client, job_id):
-        endpoint = "{}/batch-query/jobs/{}".format(Aqua.get_url(client), job_id)
+        endpoint = "v1/batch-query/jobs/{}".format(job_id)
         data = client.aqua_request("GET", endpoint).json()
         if data["status"] == "completed":
             return True
@@ -222,7 +205,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def get_file_ids(client, job_id):
-        endpoint = "{}/batch-query/jobs/{}".format(Aqua.get_url(client), job_id)
+        endpoint = "v1/batch-query/jobs/{}".format(job_id)
         data = client.aqua_request("GET", endpoint).json()
         if "segments" in data["batches"][0]:
             return data["batches"][0]["segments"]
@@ -231,7 +214,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def stream_file(client, file_id):
-        endpoint = "{}/file/{}".format(Aqua.get_url(client), file_id)
+        endpoint = "v1/file/{}".format(file_id)
         return client.aqua_request("GET", endpoint, stream=True).iter_lines()
 
 
