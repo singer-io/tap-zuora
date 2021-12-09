@@ -1,7 +1,6 @@
 import pendulum
 import singer
 from singer import metadata
-from tap_zuora.client import ApiException # pylint: disable=cyclic-import
 
 MAX_EXPORT_DAYS = 30
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
@@ -292,9 +291,12 @@ class Rest:
 
         try:
             resp = client.rest_request("POST", endpoint, json=payload).json()
-        except ApiException:
-            LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
-            return "unavailable"
+        except Exception as e:
+            if "INVALID_VALUE" in str(e):
+                LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
+                return "unavailable"
+            else:
+                raise e
 
         if resp["Success"]:
             return "available"
