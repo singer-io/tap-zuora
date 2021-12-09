@@ -291,12 +291,12 @@ class Rest:
 
         try:
             resp = client.rest_request("POST", endpoint, json=payload).json()
-        except Exception as e:
-            if "INVALID_VALUE" in str(e):
+        except Exception as request_exception: # pylint: disable=broad-except
+            if "INVALID_VALUE" in str(request_exception):
                 LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
                 return "unavailable"
             else:
-                raise e
+                raise request_exception
 
         if resp["Success"]:
             return "available"
