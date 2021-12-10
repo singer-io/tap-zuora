@@ -4,7 +4,7 @@ import singer
 
 from singer import metadata
 from tap_zuora import apis
-from tap_zuora.client import ApiException
+from tap_zuora.exceptions import ApiException
 
 
 TYPE_MAP = {

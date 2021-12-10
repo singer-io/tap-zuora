@@ -1,7 +1,7 @@
 import pendulum
 import singer
 from singer import metadata
-
+from tap_zuora.exceptions import ApiException
 
 MAX_EXPORT_DAYS = 30
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
@@ -289,7 +289,12 @@ class Rest:
             "Query": query,
             "Format": "csv"
         }
-        resp = client.rest_request("POST", endpoint, json=payload).json()
+
+        try:
+            resp = client.rest_request("POST", endpoint, json=payload).json()
+        except ApiException:
+            LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
+            return "unavailable"
 
         if resp["Success"]:
             return "available"
