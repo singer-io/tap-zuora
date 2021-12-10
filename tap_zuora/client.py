@@ -3,6 +3,7 @@ import requests
 import singer
 from singer import metrics
 from tap_zuora.apis import Aqua
+from tap_zuora.exceptions import RateLimitException, ApiException, RetryableException
 
 IS_AQUA = False
 IS_REST = True
@@ -22,19 +23,6 @@ URLS = {
 LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
-
-class RateLimitException(Exception):
-    def __init__(self, resp):
-        self.resp = resp
-        super(RateLimitException, self).__init__("Rate Limit Exceeded (429) - {}".format(self.resp.content))
-
-class ApiException(Exception):
-    def __init__(self, resp):
-        self.resp = resp
-        super(ApiException, self).__init__("{0.status_code}: {0.content}".format(self.resp))
-
-class RetryableException(ApiException):
-    """Class to mark an ApiException as retryable."""
 
 class Client:# pylint: disable=too-many-instance-attributes
     def __init__(self, username, password, partner_id, sandbox=False, european=False):
