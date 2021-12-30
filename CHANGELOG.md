@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.3
+  * Increase artifical timeout to 12 hrs to accomodate larger AQuA full table requests. [#62](https://github.com/singer-io/tap-zuora/pull/62)
+
 ## 1.3.2
   * Catch ApiExceptions for unavailable streams. [#60](https://github.com/singer-io/tap-zuora/pull/60)
 
