@@ -11,7 +11,7 @@ from tap_zuora.exceptions import ApiException
 
 PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
-DEFAULT_JOB_TIMEOUT = 5400
+DEFAULT_JOB_TIMEOUT = 12 * 60 * 60 # 12 hrs in seconds
 MAX_EXPORT_DAYS = 30
 
 LOGGER = singer.get_logger()
