@@ -25,6 +25,7 @@ REPLICATION_KEYS = [
 
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
+UNAVAILABLE_STREAMS = ["BillingPreviewRun"]
 
 LOGGER = singer.get_logger()
 
@@ -166,11 +167,14 @@ def discover_streams(client, force_rest):
     streams = []
     failed_stream_names = []
     for stream_name in discover_stream_names(client):
-        stream = discover_stream(client, stream_name, force_rest)
-        if stream:
-            streams.append(stream)
+        if stream_name not in UNAVAILABLE_STREAMS:
+            stream = discover_stream(client, stream_name, force_rest)
+            if stream:
+                streams.append(stream)
+            else:
+                failed_stream_names.append(stream_name)
         else:
-            failed_stream_names.append(stream_name)
+            LOGGER.info('Skipping stream: %s, key properties are not available for export', stream_name)
 
     if failed_stream_names:
         LOGGER.info('Failed to discover following streams: %s', failed_stream_names)
