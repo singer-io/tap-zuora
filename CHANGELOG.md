@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.4
+  * Skip 'BillingPreviewRun' stream since 'Id' field is not available for export [#64](https://github.com/singer-io/tap-zuora/pull/64)
+  
 ## 1.3.3
   * Increase artifical timeout to 12 hrs to accomodate larger AQuA full table requests. [#62](https://github.com/singer-io/tap-zuora/pull/62)
 
