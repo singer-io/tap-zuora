@@ -100,6 +100,7 @@ class Client:# pylint: disable=too-many-instance-attributes
             raise RateLimitException(resp)
         if resp.status_code == 500:
             raise RetryableException(resp)
+        resp.raise_for_status()
         return resp
 
     def _request(self, method, url, **kwargs):
