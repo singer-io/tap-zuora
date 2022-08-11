@@ -66,7 +66,7 @@ class Client:# pylint: disable=too-many-instance-attributes
                 continue
             resp.raise_for_status()
             return url_prefix
-        raise Exception("Could not discover {} {} {} data center url out of {}"
+        raise Exception("Could not discover {} {} {} data center url out of {} or your credentials were incorrect"
                         .format("EU-based" if self.european else "US-based",
                                 "REST" if rest else "AQuA",
                                 "Sandbox" if self.sandbox else "Production",
