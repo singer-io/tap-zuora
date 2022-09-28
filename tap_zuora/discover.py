@@ -142,11 +142,9 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         mdata = metadata.write(mdata, ('properties', 'Deleted'), 'inclusion', 'available')
 
     replication_key = get_replication_key(properties)
-    if replication_key:
-        replication_method = "INCREMENTAL"
-    else:
-        replication_method = "FULL_TABLE"
-
+    replication_method = "INCREMENTAL" if replication_key else "FULL_TABLE"
+    LOGGER.info(type(metadata.to_list(mdata)[0]))
+    LOGGER.info(metadata.to_list(mdata)[0].keys())
     stream = {
         "tap_stream_id": stream_name,
         "stream": stream_name,
@@ -158,7 +156,7 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         },
         'metadata': metadata.get_standard_metadata(schema={'properties': properties}, key_properties=["Id"],
                                                    replication_method=replication_method,
-                                                   valid_replication_keys=[replication_key]),
+                                                   valid_replication_keys=[replication_key] if replication_key else None),
         "replication_key": replication_key,
         "replication_method": replication_method
     }
