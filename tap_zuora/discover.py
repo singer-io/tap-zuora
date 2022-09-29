@@ -97,15 +97,22 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         return None
 
     properties = {}
-    mdata = metadata.new()
+
+    replication_key = get_replication_key(field_dict.keys())
+    replication_method = "INCREMENTAL" if replication_key else "FULL_TABLE"
+
+    mdata = metadata.get_standard_metadata(key_properties=["Id"],
+                                           valid_replication_keys=[replication_key] if replication_key else None,
+                                           replication_method=replication_method)
+    mdata = metadata.write(metadata.to_map(mdata), (), "inclusion", "available")
 
     for field_name, props in field_dict.items():
         field_properties = {}
 
         if props.get("joined", False):
             split_field_name = field_name.split(".")
-            field_name = field_name.replace(".","")
-            mdata=metadata.write(mdata, ('properties', field_name), 'tap-zuora.joined_object', split_field_name[0])
+            field_name = field_name.replace(".", "")
+            mdata = metadata.write(mdata, ('properties', field_name), 'tap-zuora.joined_object', split_field_name[0])
 
         if props["type"] in ["date", "datetime"]:
             field_properties["type"] = "string"
@@ -141,10 +148,6 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         properties["Deleted"] = {"type": "boolean"}
         mdata = metadata.write(mdata, ('properties', 'Deleted'), 'inclusion', 'available')
 
-    replication_key = get_replication_key(properties)
-    replication_method = "INCREMENTAL" if replication_key else "FULL_TABLE"
-    LOGGER.info(type(metadata.to_list(mdata)[0]))
-    LOGGER.info(metadata.to_list(mdata)[0].keys())
     stream = {
         "tap_stream_id": stream_name,
         "stream": stream_name,
@@ -154,9 +157,7 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
             "additionalProperties": False,
             "properties": properties,
         },
-        'metadata': metadata.get_standard_metadata(schema={'properties': properties}, key_properties=["Id"],
-                                                   replication_method=replication_method,
-                                                   valid_replication_keys=[replication_key] if replication_key else None),
+        'metadata': metadata.to_list(mdata),
         "replication_key": replication_key,
         "replication_method": replication_method
     }
