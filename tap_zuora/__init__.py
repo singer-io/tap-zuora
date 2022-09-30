@@ -20,6 +20,7 @@ REQUIRED_CONFIG_KEYS = [
 
 LOGGER = singer.get_logger()
 
+
 def convert_legacy_state(catalog, state):
     new_state = {"bookmarks": {}, "current_stream": state.get("current_stream")}
     for stream in catalog["streams"]:
@@ -28,8 +29,10 @@ def convert_legacy_state(catalog, state):
 
     return new_state
 
+
 def stream_is_selected(mdata):
     return mdata.get((), {}).get('selected', False)
+
 
 def validate_state(config, catalog, state):
     if "bookmarks" not in state:

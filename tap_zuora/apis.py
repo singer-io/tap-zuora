@@ -10,6 +10,7 @@ NO_DELETED_SUPPORT = ("Objects included in the queries do not support the queryi
 
 LOGGER = singer.get_logger()
 
+
 def selected_fields(stream):
     mdata = metadata.to_map(stream['metadata'])
     fields = [f for f, s in stream["schema"]["properties"].items()
@@ -21,16 +22,18 @@ def selected_fields(stream):
         fields.remove('Deleted')
     return fields
 
+
 def joined_fields(fields, stream):
     mdata = metadata.to_map(stream['metadata'])
     joined_fields_list = []
     for field_name in fields:
-        joined_obj = metadata.get(mdata, ('properties', field_name), 'tap-zuora.joined_object')
-        if joined_obj:
-            joined_fields_list.append(joined_obj + '.' + field_name.replace(joined_obj, ""))
+        if joined_obj := metadata.get(mdata, ('properties', field_name), 'tap-zuora.joined_object'):
+            joined_fields_list.append(f'{joined_obj}.' + field_name.replace(joined_obj, ""))
+
         else:
             joined_fields_list.append(field_name)
     return joined_fields_list
+
 
 def format_datetime_zoql(datetime_str, date_format):
     return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
@@ -39,9 +42,11 @@ def format_datetime_zoql(datetime_str, date_format):
 class ExportFailed(Exception):
     pass
 
+
 class ExportTimedOut(ExportFailed):
     def __init__(self, timeout, unit):
-        super().__init__("Export failed (TimedOut): The job took longer than {} {}".format(timeout, unit))
+        super().__init__(f"Export failed (TimedOut): The job took longer than {timeout} {unit}")
+
 
 class Aqua:
     ZOQL_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -107,10 +112,10 @@ class Aqua:
         selected_field_names = selected_fields(stream)
         dotted_field_names = joined_fields(selected_field_names, stream)
         fields = ", ".join(dotted_field_names)
-        query = "select {} from {}".format(fields, stream["tap_stream_id"])
+        query = f'select {fields} from {stream["tap_stream_id"]}'
         if stream.get("replication_key"):
             replication_key = stream["replication_key"]
-            query += " order by {} asc".format(replication_key)
+            query += f" order by {replication_key} asc"
 
         LOGGER.info("Executing query: %s", query)
         return query
@@ -119,7 +124,7 @@ class Aqua:
     def get_payload(state, stream, partner_id):
         stream_name = stream["tap_stream_id"]
         version = state["bookmarks"][stream["tap_stream_id"]]["version"]
-        project = "{}_{}".format(stream_name, version)
+        project = f"{stream_name}_{version}"
         query = Aqua.get_query(state, stream)
         deleted = Aqua.deleted_records_available(stream)
         payload = Aqua.make_payload(stream_name, project, query, partner_id, deleted)
@@ -174,26 +179,26 @@ class Aqua:
         object is available.
         """
         endpoint = "v1/batch-query/"
-        query = "select * from {} limit 1".format(stream_name)
+        query = f"select * from {stream_name} limit 1"
         payload = Aqua.make_payload(stream_name, "discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
 
         # Cancel this job to keep concurrency low.
-        client.aqua_request("DELETE", "v1/batch-query/jobs/{}".format(resp['id']))
+        client.aqua_request("DELETE", f"v1/batch-query/jobs/{resp['id']}")
         if "message" in resp:
             if resp["message"] == SYNTAX_ERROR:
                 return "unavailable"
             elif resp["message"] == NO_DELETED_SUPPORT:
                 return "available"
             else:
-                raise Exception("Error probing {}: {}".format(stream_name, resp["message"]))
+                raise Exception(f'Error probing {stream_name}: {resp["message"]}')
 
         return "available_with_deleted"
 
     # Must match call signature of other APIs
     @staticmethod
     def job_ready(client, job_id):
-        endpoint = "v1/batch-query/jobs/{}".format(job_id)
+        endpoint = f"v1/batch-query/jobs/{job_id}"
         data = client.aqua_request("GET", endpoint).json()
         if data["status"] == "completed":
             return True
@@ -205,7 +210,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def get_file_ids(client, job_id):
-        endpoint = "v1/batch-query/jobs/{}".format(job_id)
+        endpoint = f"v1/batch-query/jobs/{job_id}"
         data = client.aqua_request("GET", endpoint).json()
         if "segments" in data["batches"][0]:
             return data["batches"][0]["segments"]
@@ -214,7 +219,7 @@ class Aqua:
     # Must match call signature of other APIs
     @staticmethod
     def stream_file(client, file_id):
-        endpoint = "v1/file/{}".format(file_id)
+        endpoint = f"v1/file/{file_id}"
         return client.aqua_request("GET", endpoint, stream=True).iter_lines()
 
 
@@ -233,13 +238,13 @@ class Rest:
         selected_field_names = selected_fields(stream)
         dotted_field_names = joined_fields(selected_field_names, stream)
         fields = ", ".join(dotted_field_names)
-        query = "select {} from {}".format(fields, stream["tap_stream_id"])
+        query = f'select {fields} from {stream["tap_stream_id"]}'
 
         if stream.get("replication_key") and start_date and end_date:
             start_date = format_datetime_zoql(start_date, Rest.ZOQL_DATE_FORMAT)
             end_date = format_datetime_zoql(end_date, Rest.ZOQL_DATE_FORMAT)
-            query += " where {} >= '{}'".format(stream["replication_key"], start_date)
-            query += " and {} < '{}'".format(stream["replication_key"], end_date)
+            query += f""" where {stream["replication_key"]} >= '{start_date}'"""
+            query += f""" and {stream["replication_key"]} < '{end_date}'"""
 
         LOGGER.info("Executing query: %s", query)
         return query
@@ -259,7 +264,7 @@ class Rest:
     # Must match call signature of other APIs
     @staticmethod
     def job_ready(client, job_id):
-        endpoint = "v1/object/export/{}".format(job_id)
+        endpoint = f"v1/object/export/{job_id}"
         data = client.rest_request("GET", endpoint).json()
         if data["Status"] == "Completed":
             return True
@@ -271,20 +276,20 @@ class Rest:
     # Must match call signature of other APIs
     @staticmethod
     def get_file_ids(client, job_id):
-        endpoint = "v1/object/export/{}".format(job_id)
+        endpoint = f"v1/object/export/{job_id}"
         data = client.rest_request("GET", endpoint).json()
         return [data["FileId"]]
 
     # Must match call signature of other APIs
     @staticmethod
     def stream_file(client, file_id):
-        endpoint = "v1/files/{}".format(file_id)
+        endpoint = f"v1/files/{file_id}"
         return client.rest_request("GET", endpoint, stream=True).iter_lines()
 
     @staticmethod
     def stream_status(client, stream_name):
         endpoint = "v1/object/export"
-        query = "select * from {} limit 1".format(stream_name)
+        query = f"select * from {stream_name} limit 1"
         payload = {
             "Query": query,
             "Format": "csv"
@@ -296,8 +301,4 @@ class Rest:
             LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
             return "unavailable"
 
-        if resp["Success"]:
-            return "available"
-
-        # Should we raise an "Error probing" exception here?
-        return "unavailable"
+        return "available" if resp["Success"] else "unavailable"
