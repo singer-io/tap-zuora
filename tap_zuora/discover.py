@@ -25,8 +25,6 @@ REPLICATION_KEYS = [
 
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
-UNAVAILABLE_STREAMS = ["BillingPreviewRun"]
-
 LOGGER = singer.get_logger()
 
 
@@ -44,7 +42,7 @@ def parse_field_element(field_element):
 
 
 def get_field_dict(client, stream_name):
-    endpoint = "v1/describe/{}".format(stream_name)
+    endpoint = f"v1/describe/{stream_name}"
     xml_str = client.rest_request("GET", endpoint).content
     etree = ElementTree.fromstring(xml_str)
 
@@ -53,11 +51,21 @@ def get_field_dict(client, stream_name):
         field_info = parse_field_element(field_element)
         supported = True
 
+        # Make the field unsupported if type is None
         if field_info["type"] is None:
-            LOGGER.info("%s.%s has an unsupported data type", stream_name, field_info["name"])
+            LOGGER.info(f"{stream_name}.{field_info['name']} has an unsupported data type")
             supported = False
-        elif "export" not in field_info["contexts"]:
-            LOGGER.info("%s.%s not available for export", stream_name, field_info["name"])
+
+        # Skip the stream from discovery if the required field is not exportable
+        if "export" not in field_info["contexts"] and field_info["name"] in REQUIRED_KEYS:
+            LOGGER.info(f"Skipping stream {stream_name} since required field {field_info['name']}"
+                        f" not available for export")
+            field_dict = {}
+            break
+
+        # Skip the non-required field if is not exportable
+        if "export" not in field_info["contexts"]:
+            LOGGER.info(f"{stream_name}.{field_info['name']} is not available for export")
             continue
 
         field_dict[field_info["name"]] = {
@@ -79,10 +87,8 @@ def get_field_dict(client, stream_name):
 
 
 def get_replication_key(properties):
-    for key in REPLICATION_KEYS:
-        if key in properties:
-            return key
-    return None
+    return next((key for key in REPLICATION_KEYS if key in properties), None)
+
 
 def discover_stream_names(client):
     xml_str = client.rest_request("GET", "v1/describe").content
@@ -94,6 +100,9 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
     try:
         field_dict = get_field_dict(client, stream_name)
     except ApiException:
+        return None
+
+    if not field_dict:
         return None
 
     properties = {}
@@ -143,41 +152,27 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
 
     # If the entity is unavailable, we need to return None
     if status == "unavailable":
+        LOGGER.info(f"Stream {stream_name} is unavailable to export")
         return None
     elif status == "available_with_deleted":
         properties["Deleted"] = {"type": "boolean"}
         mdata = metadata.write(mdata, ('properties', 'Deleted'), 'inclusion', 'available')
 
-    stream = {
-        "tap_stream_id": stream_name,
-        "stream": stream_name,
-        "key_properties": ["Id"],
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": properties,
-        },
-        'metadata': metadata.to_list(mdata),
-        "replication_key": replication_key,
-        "replication_method": replication_method
-    }
-
-    return stream
+    return {"tap_stream_id": stream_name, "stream": stream_name, "key_properties": ["Id"],
+            "schema": {"type": "object", "additionalProperties": False, "properties": properties},
+            'metadata': metadata.to_list(mdata), "replication_key": replication_key,
+            "replication_method": replication_method}
 
 
 def discover_streams(client, force_rest):
     streams = []
     failed_stream_names = []
     for stream_name in discover_stream_names(client):
-        if stream_name not in UNAVAILABLE_STREAMS:
-            stream = discover_stream(client, stream_name, force_rest)
-            if stream:
-                streams.append(stream)
-            else:
-                failed_stream_names.append(stream_name)
-        else:
-            LOGGER.info('Skipping stream: %s, key properties are not available for export', stream_name)
 
+        if stream := discover_stream(client, stream_name, force_rest):
+            streams.append(stream)
+        else:
+            failed_stream_names.append(stream_name)
     if failed_stream_names:
-        LOGGER.info('Failed to discover following streams: %s', failed_stream_names)
+        LOGGER.info(f"Failed to discover following streams: {failed_stream_names}")
     return streams
