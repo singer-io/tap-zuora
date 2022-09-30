@@ -101,7 +101,8 @@ class Aqua:
     @staticmethod
     def deleted_records_available(stream):
         if stream['tap_stream_id'] in Aqua.DOES_NOT_SUPPORT_DELETED:
-            LOGGER.info("Deleted fields are not supported for stream - %s. Not selecting deleted records.", stream['tap_stream_id'])
+            LOGGER.info(f"Deleted fields are not supported for stream - {stream['tap_stream_id']}."
+                        f" Not selecting deleted records.")
             return False
 
         mdata = metadata.to_map(stream['metadata'])
@@ -117,7 +118,7 @@ class Aqua:
             replication_key = stream["replication_key"]
             query += f" order by {replication_key} asc"
 
-        LOGGER.info("Executing query: %s", query)
+        LOGGER.info(f"Executing query: {query}")
         return query
 
     @staticmethod
@@ -150,16 +151,14 @@ class Aqua:
         # Log to show whether the aqua request should trigger a full or
         # incremental response based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
-        LOGGER.info("Submitting aqua request with `%s`",
-                    {k: v for k, v in payload.items()
-                     if k in {'partner', 'project', 'incrementalTime'}})
+        payload_content = {k: v for k, v in payload.items() if k in {'partner', 'project', 'incrementalTime'}}
+        LOGGER.info(f"Submitting aqua request with {payload_content}")
         resp = client.aqua_request("POST", endpoint, json=payload).json()
         # Log to show whether the aqua response is in full or incremental
         # mode based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
         if 'batches' in resp:
-            LOGGER.info("Received aqua response with batch fulls=%s",
-                        [x.get('full', None) for x in resp['batches']])
+            LOGGER.info(f"Received aqua response with batch fulls={[x.get('full', None) for x in resp['batches']]}")
         else:
             LOGGER.info("Received aqua response with no batches")
         if "message" in resp:
@@ -246,7 +245,7 @@ class Rest:
             query += f""" where {stream["replication_key"]} >= '{start_date}'"""
             query += f""" and {stream["replication_key"]} < '{end_date}'"""
 
-        LOGGER.info("Executing query: %s", query)
+        LOGGER.info(f"Executing query: {query}")
         return query
 
     @staticmethod
@@ -298,7 +297,7 @@ class Rest:
         try:
             resp = client.rest_request("POST", endpoint, json=payload).json()
         except ApiException:
-            LOGGER.info("Error probing status for stream %s, assuming unavailable", stream_name)
+            LOGGER.info(f"Error probing status for stream {stream_name}, assuming unavailable")
             return "unavailable"
 
         return "available" if resp["Success"] else "unavailable"
