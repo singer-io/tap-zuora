@@ -3,8 +3,11 @@ from functools import reduce
 import unittest
 from datetime import timedelta, datetime
 
+import singer
 from singer import utils
 from tap_tester import connections, menagerie, runner
+
+LOGGER = singer.get_logger()
 
 
 class ZuoraBaseTest(unittest.TestCase):
@@ -39,7 +42,7 @@ class ZuoraBaseTest(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : ('2017-01-05T00:00:00Z'
+            'start_date' : ('2022-09-01T00:00:00Z'
                             if self.zuora_api_type == "AQUA"
                             else datetime.strftime(utils.now() - timedelta(days=30), "%Y-%m-%dT00:00:00Z")),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
@@ -144,7 +147,7 @@ class ZuoraBaseTest(unittest.TestCase):
             "RatePlanChargeTier": incremental_updated_date,
             "Refund": incremental_updated_date,
             "RefundInvoicePayment": incremental_updated_date,
-            "RefundTransactionLog": incremental_updated_date,
+            "RefundTransactionLog": incremental_transaction_date,
             "RevenueChargeSummaryItem": incremental_updated_date,
             "RevenueEventItem": incremental_updated_date,
             "RevenueEventItemCreditMemoItem": incremental_updated_date,
@@ -287,8 +290,8 @@ class ZuoraBaseTest(unittest.TestCase):
     def expected_automatic_fields(self):
         auto_fields = {}
         for k, v in self.expected_metadata().items():
-            auto_fields[k] = v.get(self.PRIMARY_KEYS, set()) | v.get(self.REPLICATION_KEYS, set()) \
-                | v.get(self.FOREIGN_KEYS, set())
+            auto_fields[k] = v.get(self.PRIMARY_KEYS, set()) | v.get(self.REPLICATION_KEYS, set()) #\
+                #| v.get(self.FOREIGN_KEYS, set())
         return auto_fields
 
     def expected_replication_method(self):
@@ -390,6 +393,8 @@ class ZuoraBaseTest(unittest.TestCase):
                 # Verify all fields within each selected stream are selected
                 for field, field_props in catalog_entry.get('annotated-schema').get('properties').items():
                     field_selected = field_props.get('selected')
+                    LOGGER.info("field_selected.......:%s",field_selected)
+                    print("field_selected.......",field_selected)
                     LOGGER.info("\tValidating selection on %s.%s: %s",
                                 cat['stream_name'], field, field_selected)
                     self.assertTrue(field_selected, msg="Field not selected.")
@@ -422,7 +427,7 @@ class ZuoraBaseTest(unittest.TestCase):
         for catalog in catalogs:
             schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
 
-            non_selected_properties = []
+            non_selected_properties = [] #['SequenceSetId'] #if self.zuora_api_type=='REST' else [] #[]
             if not select_all_fields:
                 # get a list of all properties so that none are selected
                 non_selected_properties = schema.get('annotated-schema', {}).get(
