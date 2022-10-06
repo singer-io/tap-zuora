@@ -3,6 +3,7 @@ import singer
 from singer import metadata
 from tap_zuora import apis
 from tap_zuora.exceptions import ApiException
+from typing import Union, List, Dict, KeysView
 
 
 TYPE_MAP = {
@@ -20,6 +21,24 @@ REPLICATION_KEYS = [
     "TransactionDate",
     "UpdatedOn",
 ]
+
+UNSUPPORTED_FIELDS_FOR_REST = {
+    "Account":  ["SequenceSetId"],
+    "Amendment":  ["BookingDate", " EffectivePolicy", "NewRatePlanId", "RemovedRatePlanId", "SubType"],
+    "BillingRun": ["BillingRunType", "NumberOfCreditMemos", "PostedDate"],
+    "Export": ["Encoding"],
+    "Invoice": ["PaymentTerm", "SourceType", "TaxMessage", "TaxStatus", "TemplateId"],
+    "InvoiceItem": ["Balance", "ExcludeItemBillingFromRevenueAccounting"],
+    "InvoiceItemAdjustment": ["ExcludeItemBillingFromRevenueAccounting"],
+    "PaymentMethod": ["StoredCredentialProfileId"],
+    "ProductRatePlanCharge": ["ExcludeItemBillingFromRevenueAccounting", "ExcludeItemBookingFromRevenueAccounting"],
+    "RatePlanCharge": ["AmendedByOrderOn", "CreditOption", "DrawdownRate", "DrawdownUom",
+                       "ExcludeItemBillingFromRevenueAccounting", "ExcludeItemBookingFromRevenueAccounting",
+                       "IsPrepaid", "OriginalOrderDate", "PaymentTermSnapshot", "PrepaidOperationType",
+                       "PrepaidQuantity", "PrepaidTotalQuantity", "PrepaidUom", "ValidityPeriodType"],
+    "Subscription": ["IsLatestVersion", "LastBookingDate", "PaymentTerm", "Revision"],
+    "TaxationItem": ["Balance", "CreditAmount", "PaymentAmount"],
+    "Usage": ["ImportId"]}
 
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
@@ -39,7 +58,7 @@ def parse_field_element(field_element):
     }
 
 
-def get_field_dict(client, stream_name):
+def get_field_dict(client, stream_name: str) -> Dict:
     endpoint = f"v1/describe/{stream_name}"
     xml_str = client.rest_request("GET", endpoint).content
     etree = ElementTree.fromstring(xml_str)
@@ -84,7 +103,7 @@ def get_field_dict(client, stream_name):
     return field_dict
 
 
-def get_replication_key(properties):
+def get_replication_key(properties: KeysView) -> Union[str, None]:
     return next((key for key in REPLICATION_KEYS if key in properties), None)
 
 
@@ -94,7 +113,16 @@ def discover_stream_names(client):
     return [t.text for t in etree.findall("./object/name")]
 
 
-def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many-branches
+def is_unsupported_field(stream_name: str, field_name: str, is_rest: bool) -> bool:
+    """
+    Checks whether a given field for a given stream is supported
+    applicable only for REST api calls
+    """
+    unsupported_fields = UNSUPPORTED_FIELDS_FOR_REST.get(stream_name, [])
+    return bool(unsupported_fields and is_rest and field_name in unsupported_fields)
+
+
+def discover_stream(client, stream_name: str, force_rest: bool) -> Union[Dict, None]:
     try:
         field_dict = get_field_dict(client, stream_name)
     except ApiException:
@@ -108,6 +136,7 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
     replication_key = get_replication_key(field_dict.keys())
     replication_method = "INCREMENTAL" if replication_key else "FULL_TABLE"
 
+    # adds empty breadcrumb for selecting stream in catalog file
     mdata = metadata.get_standard_metadata(key_properties=["Id"],
                                            valid_replication_keys=[replication_key] if replication_key else None,
                                            replication_method=replication_method)
@@ -131,11 +160,11 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
             field_properties["type"] = [field_properties["type"], "null"]
 
         if field_name in REQUIRED_KEYS:
-            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
-        elif props["supported"]:
-            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "automatic")
+        elif props["supported"] and not is_unsupported_field(stream_name, field_name, force_rest):
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "available")
         else:
-            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'unsupported')
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "unsupported")
 
         properties[field_name] = field_properties
 
@@ -154,15 +183,15 @@ def discover_stream(client, stream_name, force_rest): # pylint: disable=too-many
         return None
     elif status == "available_with_deleted":
         properties["Deleted"] = {"type": "boolean"}
-        mdata = metadata.write(mdata, ('properties', 'Deleted'), 'inclusion', 'available')
+        mdata = metadata.write(mdata, ("properties", "Deleted"), "inclusion", "available")
 
     return {"tap_stream_id": stream_name, "stream": stream_name, "key_properties": ["Id"],
             "schema": {"type": "object", "additionalProperties": False, "properties": properties},
-            'metadata': metadata.to_list(mdata), "replication_key": replication_key,
+            "metadata": metadata.to_list(mdata), "replication_key": replication_key,
             "replication_method": replication_method}
 
 
-def discover_streams(client, force_rest):
+def discover_streams(client, force_rest: bool) -> List:
     streams = []
     failed_stream_names = []
     for stream_name in discover_stream_names(client):
