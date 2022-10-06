@@ -68,7 +68,12 @@ class Aqua:
         'ProcessedUsage',
         'RefundTransactionLog',
         'UpdaterBatch',
-        'UpdaterDetail'
+        'UpdaterDetail',
+        'BookingTransaction',
+        'CalloutHistory',
+        'SmartPreventionAudit',
+        'HpmCaptchaValidationResult',
+        'EmailHistory'
     ]
 
     @staticmethod
@@ -114,8 +119,7 @@ class Aqua:
         dotted_field_names = joined_fields(selected_field_names, stream)
         fields = ", ".join(dotted_field_names)
         query = f'select {fields} from {stream["tap_stream_id"]}'
-        if stream.get("replication_key"):
-            replication_key = stream["replication_key"]
+        if replication_key := stream.get("replication_key"):
             query += f" order by {replication_key} asc"
 
         LOGGER.info(f"Executing query: {query}")
@@ -263,6 +267,7 @@ class Rest:
     # Must match call signature of other APIs
     @staticmethod
     def job_ready(client, job_id):
+        LOGGER.info(f"job details: Id.{job_id}")
         endpoint = f"v1/object/export/{job_id}"
         data = client.rest_request("GET", endpoint).json()
         if data["Status"] == "Completed":
