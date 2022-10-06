@@ -30,7 +30,7 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         that 251 (or more) records have been posted for that stream.
         """
 
-        expected_streams = {'AchNocEventLog'}#self.expected_streams() - {'JournalEntryDetailPaymentApplication','BookingTransaction'}
+        expected_streams = self.expected_streams() - {'JournalEntryDetailPaymentApplication','BookingTransaction'}
 
         # Instantiate connection
         conn_id = connections.ensure_connection(self)
