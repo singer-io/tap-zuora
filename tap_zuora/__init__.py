@@ -4,7 +4,7 @@ import time
 
 import singer
 
-from singer import metadata
+from singer import metadata, Catalog
 from tap_zuora.client import Client
 from tap_zuora.discover import discover_streams
 from tap_zuora.sync import sync_stream
@@ -21,7 +21,7 @@ REQUIRED_CONFIG_KEYS = [
 LOGGER = singer.get_logger()
 
 
-def convert_legacy_state(catalog, state):
+def convert_legacy_state(catalog: Catalog, state: dict) -> dict:
     new_state = {"bookmarks": {}, "current_stream": state.get("current_stream")}
     for stream in catalog["streams"]:
         if stream.get("selected") and stream.get("replication_key") and stream["tap_stream_id"] in state:
@@ -30,11 +30,11 @@ def convert_legacy_state(catalog, state):
     return new_state
 
 
-def stream_is_selected(mdata):
+def stream_is_selected(mdata: dict) -> bool:
     return mdata.get((), {}).get('selected', False)
 
 
-def validate_state(config, catalog, state):
+def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
     if "bookmarks" not in state:
         if state.keys():
             LOGGER.info("Legacy state detected")
@@ -69,14 +69,14 @@ def validate_state(config, catalog, state):
     return state
 
 
-def do_discover(client, force_rest=False):
+def do_discover(client: Client, force_rest: bool = False):
     LOGGER.info("Starting discover")
     catalog = {"streams": discover_streams(client, force_rest)}
     json.dump(catalog, sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
 
-def do_sync(client, catalog, state, force_rest=False):
+def do_sync(client: Client, catalog: Catalog, state: dict, force_rest: bool = False):
     starting_stream = state.get("current_stream")
     if starting_stream:
         LOGGER.info("Resuming sync from %s", starting_stream)
@@ -109,6 +109,7 @@ def do_sync(client, catalog, state, force_rest=False):
     state["current_stream"] = None
     singer.write_state(state)
     LOGGER.info("Finished sync")
+
 
 @singer.utils.handle_top_exception(LOGGER)
 def main():
