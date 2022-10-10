@@ -15,8 +15,9 @@ LOGGER = singer.get_logger()
 def selected_fields(stream: Dict) -> List:
     mdata = metadata.to_map(stream["metadata"])
     fields = [f for f, s in stream["schema"]["properties"].items()
-              if metadata.get(mdata, ("properties", f), "selected")
-              or metadata.get(mdata, ("properties", f), "inclusion") == "automatic"]
+              if (metadata.get(mdata, ("properties", f), "selected")
+              or metadata.get(mdata, ("properties", f), "inclusion") == "automatic")
+              and metadata.get(mdata, ("properties", f), "inclusion") != "unsupported"]
 
     # Remove Deleted from the query if its selected
     if "Deleted" in fields:
