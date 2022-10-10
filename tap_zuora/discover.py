@@ -24,7 +24,7 @@ REPLICATION_KEYS = [
 
 UNSUPPORTED_FIELDS_FOR_REST = {
     "Account":  ["SequenceSetId"],
-    "Amendment":  ["BookingDate", " EffectivePolicy", "NewRatePlanId", "RemovedRatePlanId", "SubType"],
+    "Amendment":  ["BookingDate", "EffectivePolicy", "NewRatePlanId", "RemovedRatePlanId", "SubType"],
     "BillingRun": ["BillingRunType", "NumberOfCreditMemos", "PostedDate"],
     "Export": ["Encoding"],
     "Invoice": ["PaymentTerm", "SourceType", "TaxMessage", "TaxStatus", "TemplateId"],
