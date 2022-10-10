@@ -25,7 +25,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
         date_object_utc = date_object.astimezone(tz=pytz.UTC)
         return datetime.datetime.strftime(date_object_utc, "%Y-%m-%dT%H:%M:%SZ")
 
-    def calculated_states_by_stream(self, current_state):
+    def calculated_states_by_stream(self, current_state, expected_streams):
         """
         Look at the bookmarks from a previous sync and set a new bookmark
         value that is 1 day prior. This ensures the subsequent sync will replicate
@@ -34,10 +34,10 @@ class ZuoraBookmarking(ZuoraBaseTest):
 
         stream_to_current_state = {stream : bookmark.get(self.expected_replication_keys()[stream].pop())
                                    for stream, bookmark in current_state['bookmarks'].items()}
-        stream_to_calculated_state = {stream: "" for stream in self.expected_sync_streams()}
+        stream_to_calculated_state = {stream: "" for stream in expected_streams}
 
         timedelta_by_stream = {stream: [1,0,0]  # {stream_name: [days, hours, minutes], ...}
-                               for stream in self.expected_streams()}
+                               for stream in expected_streams}
         timedelta_by_stream['Account'] = [0, 0, 2]
 
         for stream, state in stream_to_current_state.items():
@@ -63,7 +63,9 @@ class ZuoraBookmarking(ZuoraBaseTest):
         
         #a1 ={'Account', 'Amendment', 'BillingRun', 'Export', 'Invoice', 'InvoiceItem', 'InvoiceSplitItem', 'InvoiceItemAdjustment'}
         #a2 = {'StoredCredentialProfile', 'PaymentMethod'}
-        expected_streams =  self.expected_streams() #- a1 - a2
+        expected_streams =  {'Account', 'Amendment', 'BillingRun', 'Export', 'Invoice', 'InvoiceItem',
+         'InvoiceSplitItem', 'InvoiceItemAdjustment',' StoredCredentialProfile', 'PaymentMethod'}
+        #self.expected_streams() #- a1 - a2
         expected_replication_keys = self.expected_replication_keys()
         expected_replication_methods = self.expected_replication_method()
 
@@ -87,7 +89,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
         ##########################################################################
 
         new_states = {'bookmarks': dict()}
-        simulated_states = self.calculated_states_by_stream(first_sync_bookmarks)
+        simulated_states = self.calculated_states_by_stream(first_sync_bookmarks, expected_streams)
         for stream, new_state in simulated_states.items():
             new_states['bookmarks'][stream] = new_state
         menagerie.set_state(conn_id, new_states)
