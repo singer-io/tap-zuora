@@ -399,8 +399,21 @@ class ZuoraBaseTest(unittest.TestCase):
                                 cat['stream_name'], field, field_selected)
                     self.assertTrue(field_selected, msg="Field not selected.")
             else:
+                # Few streams have updatedAt and TransactionDate both the fields and both are automatic 
+                # but updatedAt is the only field used as replication key
+                additional_automatic_field_in_streams = {'BookingTransaction','JournalEntryDetailRefundInvoicePayment',
+                'JournalEntryDetailPaymentApplication','JournalEntryDetailCreditBalanceAdjustment','JournalEntryDetailInvoiceItem',
+                'JournalEntryDetailCreditMemoApplicationItem','JournalEntryDetailCreditMemoItem','JournalEntryDetailPaymentApplicationItem',
+                'JournalEntryDetailRevenueEventItem','JournalEntryDetailRefundApplication','JournalEntryDetailRefundApplicationItem',
+                'JournalEntryDetailDebitMemoItem','JournalEntryDetailCreditTaxationItem','JournalEntryDetailInvoicePayment',
+                'JournalEntryDetailInvoiceAdjustment','JournalEntryDetailTaxationItem','JournalEntryDetailDebitTaxationItem',
+                'JournalEntryDetailInvoiceItemAdjustment'}
+                
                 # Verify only automatic fields are selected
                 expected_automatic_fields = self.expected_automatic_fields().get(cat['tap_stream_id'])
+                        
+                if cat['stream_name'] in additional_automatic_field_in_streams:
+                    expected_automatic_fields.add('TransactionDate')
                 selected_fields = self.get_selected_fields_from_metadata(catalog_entry['metadata'])
                 self.assertEqual(expected_automatic_fields, selected_fields)
 
