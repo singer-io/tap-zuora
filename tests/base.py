@@ -42,9 +42,7 @@ class ZuoraBaseTest(unittest.TestCase):
 
     def get_properties(self):
         return {
-            'start_date' : ('2022-09-01T00:00:00Z'
-                            if self.zuora_api_type == "AQUA"
-                            else datetime.strftime(utils.now() - timedelta(days=30), "%Y-%m-%dT00:00:00Z")),
+            'start_date' : datetime.strftime(utils.now() - timedelta(days=3), "%Y-%m-%dT00:00:00Z"),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
             'api_type' : self.zuora_api_type,
             'sandbox' : 'true'
