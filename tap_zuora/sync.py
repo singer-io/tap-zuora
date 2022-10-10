@@ -1,10 +1,8 @@
 import csv
 import io
 import time
-
 import pendulum
 import singer
-
 from singer import transform
 from tap_zuora import apis
 from tap_zuora.exceptions import ApiException
@@ -149,7 +147,6 @@ def handle_aqua_timeout(ex, stream, state):
 
 
 def sync_aqua_stream(client, state, stream, counter):
-    timed_out = False
     try:
         file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
         if not file_ids:
