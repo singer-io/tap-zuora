@@ -18,7 +18,7 @@ jobs:
           name: 'pylint'
           command: |
             source /usr/local/share/virtualenvs/tap-zuora/bin/activate
-            pylint tap_zuora -d missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return,unused-argument
+            pylint tap_zuora -d "$PYLINT_DISABLE_LIST,missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return,unused-argument"
       - add_ssh_keys
       - run:
           name: 'Integration Tests'
