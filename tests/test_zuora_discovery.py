@@ -1,4 +1,5 @@
 from tap_tester import menagerie, connections
+from tap_tester.logger import LOGGER
 from base import ZuoraBaseTest
 
 class DiscoveryTest(ZuoraBaseTest):
