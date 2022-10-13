@@ -30,9 +30,9 @@ def convert_legacy_state(catalog: Catalog, state: dict) -> dict:
             and stream.replication_key
             and stream.tap_stream_id in state
         ):
-            new_state["bookmarks"][stream["tap_stream_id"]][
-                stream["replication_key"]
-            ] = state[stream["tap_stream_id"]]
+            new_state["bookmarks"][stream.tap_stream_id][
+                stream.replication_key
+            ] = state[stream.tap_stream_id]
 
     return new_state
 
@@ -65,7 +65,7 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
             continue
 
         if stream.tap_stream_id not in state["bookmarks"]:
-            LOGGER.info("Initializing state for %s", stream.tap_stream_id)
+            LOGGER.info(f"Initializing state for {stream.tap_stream_id}")
             singer.write_bookmark(
                 state, stream.tap_stream_id, "version", int(time.time())
             )
@@ -78,9 +78,10 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
             or state["bookmarks"][stream.tap_stream_id][stream.replication_key] is None
         ):
             LOGGER.info(
-                "Setting start date for %s to %s",
-                stream.tap_stream_id,
-                config["start_date"],
+                f'Setting start date for '
+                f'{stream.tap_stream_id} to '
+                f'{config["start_date"]}',
+
             )
             singer.write_bookmark(
                 state,
@@ -104,32 +105,32 @@ def do_sync(client: Client, catalog: Catalog, state: dict, force_rest: bool = Fa
     """Starts the sync process for all the selected streams."""
     starting_stream = state.get("current_stream")
     if starting_stream:
-        LOGGER.info("Resuming sync from %s", starting_stream)
+        LOGGER.info(f"Resuming sync from {starting_stream}")
     else:
         LOGGER.info("Starting sync")
 
     for stream in catalog.streams:
         stream_name = stream.tap_stream_id
         if not stream_is_selected(metadata.to_map(stream.metadata)):
-            LOGGER.info("%s: Skipping - not selected", stream_name)
+            LOGGER.info(f"{stream_name}: Skipping - not selected")
             continue
 
         if starting_stream:
             if starting_stream == stream_name:
-                LOGGER.info("%s: Resuming", stream_name)
+                LOGGER.info(f"{stream_name}: Resuming")
                 starting_stream = None
             else:
-                LOGGER.info("%s: Skipping - already synced", stream_name)
+                LOGGER.info(f"{stream_name}: Skipping - already synced")
                 continue
         else:
-            LOGGER.info("%s: Starting", stream_name)
+            LOGGER.info(f"{stream_name}: Starting")
 
         state["current_stream"] = stream_name
         singer.write_state(state)
         singer.write_schema(stream_name, stream.schema.to_dict(), stream.key_properties)
         counter = sync_stream(client, state, stream.to_dict(), force_rest)
 
-        LOGGER.info("%s: Completed sync (%s rows)", stream_name, counter.value)
+        LOGGER.info(f"{stream_name}: Completed sync ({counter.value} rows)")
 
     state["current_stream"] = None
     singer.write_state(state)
