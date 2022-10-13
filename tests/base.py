@@ -60,14 +60,19 @@ class ZuoraBaseTest(unittest.TestCase):
                 'password': os.getenv('TAP_ZUORA_PASSWORD')
         }
 
-    def get_properties(self):
+    def get_properties(self, original: bool = True):
         """Configuration of properties required for the tap."""
-        return {
+        return_value = {
             'start_date' : datetime.strftime(utils.now() - timedelta(days=3), "%Y-%m-%dT00:00:00Z"),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
             'api_type' : self.zuora_api_type,
             'sandbox' : 'true'
         }
+        if original:
+            return return_value
+
+        return_value["start_date"] = self.start_date
+        return return_value
 
     def expected_metadata(self):
         """The expected streams and metadata about the streams"""

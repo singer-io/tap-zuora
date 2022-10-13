@@ -35,7 +35,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         ##########################################################################
 
         # Instantiate connection
-        conn_id_1 = connections.ensure_connection(self)
+        conn_id_1 = connections.ensure_connection(self, original_properties=False)
 
         # Run check mode
         found_catalogs_1 = self.run_and_verify_check_mode(conn_id_1)
@@ -63,7 +63,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         ##########################################################################
 
         # Create a new connection with the new start_date
-        conn_id_2 = connections.ensure_connection(self)
+        conn_id_2 = connections.ensure_connection(self, original_properties=False)
 
         # Run check mode
         found_catalogs_2 = self.run_and_verify_check_mode(conn_id_2)
