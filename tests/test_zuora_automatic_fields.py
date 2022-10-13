@@ -1,11 +1,4 @@
-"""
-Test that with no fields selected for a stream automatic fields are still replicated
-"""
-import unittest
-from datetime import datetime, timedelta
-
 from tap_tester import runner, connections
-
 from base import ZuoraBaseTest
 
 
@@ -16,10 +9,11 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         return "tap_tester_zuora_automatic_fields_rest"
 
     def test_run(self):
-        self.zuora_api_type = "REST"
-        self.run_test()
+        """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
+        self.run_test("AQUA")
+        self.run_test("REST")
 
-    def run_test(self):
+    def run_test(self, api_type):
         """
         Verify that for each stream you can get multiple pages of data
         when no fields are selected and only the automatic fields are replicated.
@@ -29,8 +23,8 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         fetch of data.  For instance if you have a limit of 250 records ensure
         that 251 (or more) records have been posted for that stream.
         """
-
-        expected_streams = self.expected_streams() - {'JournalEntryDetailPaymentApplication','BookingTransaction'}
+        self.zuora_api_type = api_type
+        expected_streams =  {'Export', 'Order', 'RatePlan', 'RatePlanCharge', 'RatePlanChargeTier', 'Account', 'Contact'}
 
         # Instantiate connection
         conn_id = connections.ensure_connection(self)
@@ -52,6 +46,8 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
             with self.subTest(stream=stream):
                 # Expected values
                 expected_keys = self.expected_automatic_fields().get(stream)
+
+
                 expected_primary_keys = self.expected_primary_keys()[stream]
 
                 # Collect actual values

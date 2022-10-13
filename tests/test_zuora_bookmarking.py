@@ -3,12 +3,12 @@ import dateutil.parser
 import pytz
 import copy
 
-from tap_tester import runner, menagerie, connections
 from singer.utils import strptime_to_utc
-
+from tap_tester import runner, menagerie, connections
 from base import ZuoraBaseTest
 
 class ZuoraBookmarking(ZuoraBaseTest):
+
     @staticmethod
     def name():
         return "tap_tester_zuora_bookmarking"
@@ -51,21 +51,35 @@ class ZuoraBookmarking(ZuoraBaseTest):
       
         return stream_to_calculated_state["bookmarks"]
 
-    def test_run(self) :        
+    def test_run(self) : 
+        """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""       
         self.run_test("AQUA")
         self.run_test("REST")
 
     def run_test(self, api_type):
+        """
+        Verify that for each stream you can do a sync which records bookmarks.
+        That the bookmark is the maximum value sent to the target for the replication key.
+        That a second sync respects the bookmark
+            All data of the second sync is >= the bookmark from the first sync
+            The number of records in the 2nd sync is less then the first (This assumes that
+                new data added to the stream is done at a rate slow enough that you haven't
+                doubled the amount of data from the start date to the first sync between
+                the first sync and second sync run in this test)
+
+        Verify that for full table stream, all data replicated in sync 1 is replicated again in sync 2.
+
+        PREREQUISITE
+        For EACH stream that is incrementally replicated there are multiple rows of data with
+            different values for the replication key
+        """        
         self.zuora_api_type = api_type
 
         # Select only the expected streams tables
-        expected_streams = {'PaymentMethodTransactionLog', 'OrderAction', 'ContactSnapshot', 'Export'} 
-        # 'Export', 'Order', 'RatePlan', 'RatePlanCharge', 'RatePlanChargeTier', 'Account', 'Contact'}
-
+        expected_streams = {'PaymentMethodTransactionLog', 'OrderAction', 'ContactSnapshot', 'Export'}
         expected_replication_keys = self.expected_replication_keys()
         expected_replication_methods = self.expected_replication_method()
 
-        # SYNC 1
         conn_id = connections.ensure_connection(self)
 
         # Run in check mode
@@ -79,7 +93,6 @@ class ZuoraBookmarking(ZuoraBaseTest):
         first_sync_record_count = self.run_and_verify_sync(conn_id)
         first_sync_records = runner.get_records_from_target_output()
         first_sync_bookmarks = menagerie.get_state(conn_id)
-        print("first_sync_bookmarks.......",first_sync_bookmarks)
 
         ##########################################################################
         # Update State Between Syncs
@@ -87,7 +100,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
 
         new_states = {'bookmarks': dict()}
         simulated_states = self.calculated_states_by_stream(first_sync_bookmarks, expected_streams)
-        print("simulated_states.....",simulated_states)
+
         for stream, new_state in simulated_states.items():
             new_states['bookmarks'][stream] = new_state
         menagerie.set_state(conn_id, new_states)
@@ -99,9 +112,6 @@ class ZuoraBookmarking(ZuoraBaseTest):
         second_sync_record_count = self.run_and_verify_sync(conn_id)
         second_sync_records = runner.get_records_from_target_output()
         second_sync_bookmarks = menagerie.get_state(conn_id)
-        
-        print("AFTERRR first_sync_bookmarks.......",first_sync_bookmarks)
-        print("second_sync_bookmarks.......",second_sync_bookmarks)
 
         ##########################################################################
         # Test By Stream

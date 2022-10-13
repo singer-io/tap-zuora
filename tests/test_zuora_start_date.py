@@ -10,8 +10,9 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         return "tap_tester_zuora_start_date_test"
 
     def test_run(self):
-        self.run_test("REST")
+        """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
         self.run_test("AQUA")
+        self.run_test("REST")
 
     def run_test(self, api_type):
         """
@@ -28,8 +29,6 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         self.start_date = self.start_date_1
 
         expected_streams = {'PaymentMethodTransactionLog', 'Account', 'Contact'}
-        #, 'RevenueScheduleItem', 'RevenueScheduleItemInvoiceItem','RevenueEventItemInvoiceItem', 'RevenueEventItem'}
-        #self.expected_streams()
 
         ##########################################################################
         # First Sync
@@ -99,9 +98,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
                                        if message.get('action') == 'upsert']
 
                 primary_keys_sync_1 = set(primary_keys_list_1)
-                print("primary_keys_sync_1.....",primary_keys_sync_1)
                 primary_keys_sync_2 = set(primary_keys_list_2)
-                print("primary_keys_list_2.....",primary_keys_list_2)
 
                 if expected_metadata.get(self.OBEYS_START_DATE):
 

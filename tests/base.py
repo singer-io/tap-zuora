@@ -1,5 +1,4 @@
 import os
-from functools import reduce
 import unittest
 from datetime import timedelta, datetime
 
@@ -11,6 +10,12 @@ LOGGER = singer.get_logger()
 
 
 class ZuoraBaseTest(unittest.TestCase):
+    """
+    Setup expectations for test sub classes.
+    Metadata describing streams.
+    A bunch of shared methods that are used in tap-tester tests.
+    Shared tap-specific methods (as needed).
+    """
     PRIMARY_KEYS = "table-key-properties"
     START_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
     BOOKMARK_COMPARISON_FORMAT = "%Y-%m-%dT%H:%M:%S.000000Z"
@@ -20,27 +25,43 @@ class ZuoraBaseTest(unittest.TestCase):
     FULL_TABLE = "FULL_TABLE"
     OBEYS_START_DATE = "obey-start-date"
     zuora_api_type = ""
-    def tap_name(self):
-        return "tap-zuora"
+
+    # Few streams have UpdatedAt and TransactionDate both the fields and both are automatic 
+    # but updatedAt is the only field used as replication key
+    additional_automatic_field_in_streams = {'BookingTransaction','JournalEntryDetailRefundInvoicePayment',
+    'JournalEntryDetailPaymentApplication','JournalEntryDetailCreditBalanceAdjustment','JournalEntryDetailInvoiceItem',
+    'JournalEntryDetailCreditMemoApplicationItem','JournalEntryDetailCreditMemoItem','JournalEntryDetailPaymentApplicationItem',
+    'JournalEntryDetailRevenueEventItem','JournalEntryDetailRefundApplication','JournalEntryDetailRefundApplicationItem',
+    'JournalEntryDetailDebitMemoItem','JournalEntryDetailCreditTaxationItem','JournalEntryDetailInvoicePayment',
+    'JournalEntryDetailInvoiceAdjustment','JournalEntryDetailTaxationItem','JournalEntryDetailDebitTaxationItem',
+    'JournalEntryDetailInvoiceItemAdjustment'}
 
     def name(self):
         return "tap_tester_zuora"
 
+    def tap_name(self):
+        """The name of the tap"""
+        return "tap-zuora"
+
     def setUp(self):
+        """Checking required environment variables"""
         missing_envs = [x for x in [os.getenv('TAP_ZUORA_USERNAME'),
                                     os.getenv('TAP_ZUORA_PASSWORD')] if x == None]
         if len(missing_envs) != 0:
             raise Exception("set TAP_ZUORA_USERNAME, TAP_ZUORA_PASSWORD")
 
     def get_type(self):
+        """The expected url route ending"""
         return "platform.zuora"
 
     def get_credentials(self):
+        """Authentication information for the test account"""
         return {'username': os.getenv('TAP_ZUORA_USERNAME'),
                 'password': os.getenv('TAP_ZUORA_PASSWORD')
         }
 
     def get_properties(self):
+        """Configuration of properties required for the tap."""
         return {
             'start_date' : datetime.strftime(utils.now() - timedelta(days=3), "%Y-%m-%dT00:00:00Z"),
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
@@ -267,16 +288,6 @@ class ZuoraBaseTest(unittest.TestCase):
                 for table, properties
                 in self.expected_metadata().items()}
 
-    def expected_foreign_keys(self):
-        """
-        return a dictionary with key of table name
-        and value as a set of foreign key fields
-        """
-        return {table: properties.get(self.FOREIGN_KEYS, set())
-                for table, properties
-                in self.expected_metadata().items()}
-
-
     def expected_automatic_fields(self):
         auto_fields = {}
         for k, v in self.expected_metadata().items():
@@ -285,20 +296,10 @@ class ZuoraBaseTest(unittest.TestCase):
         return auto_fields
 
     def expected_replication_method(self):
-        """return a dictionary with key of table name nd value of replication method"""
+        """return a dictionary with key of table name and value of replication method"""
         return {table: properties.get(self.REPLICATION_METHOD, None)
                 for table, properties
                 in self.expected_metadata().items()}
-
-    # def setUp(self):
-    #     """Verify that you have set the prerequisites to run the tap (creds, etc.)"""
-    #     missing_envs = [x for x in ['TAP_SALESFORCE_CLIENT_ID',
-    #                                 'TAP_SALESFORCE_CLIENT_SECRET',
-    #                                 'TAP_SALESFORCE_REFRESH_TOKEN']
-    #                     if os.getenv(x) is None]
-
-    #     if missing_envs:
-    #         raise Exception("set environment variables")
 
     #########################
     #   Helper Methods      #
@@ -386,27 +387,18 @@ class ZuoraBaseTest(unittest.TestCase):
                     LOGGER.info("\tValidating selection on %s.%s: %s",
                                 cat['stream_name'], field, field_selected)
                     self.assertTrue(field_selected, msg="Field not selected.")
-            else:
-                # Few streams have updatedAt and TransactionDate both the fields and both are automatic 
-                # but updatedAt is the only field used as replication key
-                additional_automatic_field_in_streams = {'BookingTransaction','JournalEntryDetailRefundInvoicePayment',
-                'JournalEntryDetailPaymentApplication','JournalEntryDetailCreditBalanceAdjustment','JournalEntryDetailInvoiceItem',
-                'JournalEntryDetailCreditMemoApplicationItem','JournalEntryDetailCreditMemoItem','JournalEntryDetailPaymentApplicationItem',
-                'JournalEntryDetailRevenueEventItem','JournalEntryDetailRefundApplication','JournalEntryDetailRefundApplicationItem',
-                'JournalEntryDetailDebitMemoItem','JournalEntryDetailCreditTaxationItem','JournalEntryDetailInvoicePayment',
-                'JournalEntryDetailInvoiceAdjustment','JournalEntryDetailTaxationItem','JournalEntryDetailDebitTaxationItem',
-                'JournalEntryDetailInvoiceItemAdjustment'}
-                
+            else:                
                 # Verify only automatic fields are selected
                 expected_automatic_fields = self.expected_automatic_fields().get(cat['tap_stream_id'])
                         
-                if cat['stream_name'] in additional_automatic_field_in_streams:
+                if cat['stream_name'] in self.additional_automatic_field_in_streams:
                     expected_automatic_fields.add('TransactionDate')
                 selected_fields = self.get_selected_fields_from_metadata(catalog_entry['metadata'])
                 self.assertEqual(expected_automatic_fields, selected_fields)
 
     @staticmethod
     def get_selected_fields_from_metadata(metadata):
+        """ Function to fetch the fields with inclusion available or automatic"""
         selected_fields = set()
         for field in metadata:
             is_field_metadata = len(field['breadcrumb']) > 1
@@ -428,7 +420,7 @@ class ZuoraBaseTest(unittest.TestCase):
         for catalog in catalogs:
             schema = menagerie.get_annotated_schema(conn_id, catalog['stream_id'])
 
-            non_selected_properties = [] #['SequenceSetId'] #if self.zuora_api_type=='REST' else [] #[]
+            non_selected_properties = []
             if not select_all_fields:
                 # get a list of all properties so that none are selected
                 non_selected_properties = schema.get('annotated-schema', {}).get(
@@ -437,62 +429,25 @@ class ZuoraBaseTest(unittest.TestCase):
             connections.select_catalog_and_fields_via_metadata(
                 conn_id, catalog, schema, [], non_selected_properties)
 
-    def set_replication_methods(self, conn_id, catalogs, replication_methods):
-
-        replication_keys = self.expected_replication_keys()
-
-        for catalog in catalogs:
-
-            replication_method = replication_methods.get(catalog['stream_name'])
-
-            if replication_method == self.INCREMENTAL:
-                replication_key = list(replication_keys.get(catalog['stream_name']))[0]
-                replication_md = [{ "breadcrumb": [], "metadata": {'replication-key': replication_key, "replication-method" : replication_method, "selected" : True}}]
-            else:
-                replication_md = [{ "breadcrumb": [], "metadata": {'replication-key': None, "replication-method" : "FULL_TABLE", "selected" : True}}]
-
-            connections.set_non_discoverable_metadata(
-                conn_id, catalog, menagerie.get_annotated_schema(conn_id, catalog['stream_id']), replication_md)
-
-    @staticmethod
-    def parse_date(date_value):
+    def parse_date(self, date_value):
         """
         Pass in string-formatted-datetime, parse the value, and return it as an unformatted datetime object.
         """
-        try:
-            date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%fZ")
-            return date_stripped
-        except ValueError:
+        date_formats = {
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S.%f+00:00",
+            "%Y-%m-%dT%H:%M:%S+00:00",
+            "%Y-%m-%d"
+        }
+        for date_format in date_formats:
             try:
-                date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%SZ")
+                date_stripped = datetime.strptime(date_value, date_format)
                 return date_stripped
             except ValueError:
-                try:
-                    date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%f+00:00")
-                    return date_stripped
-                except ValueError:
-                    try:
-                        date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S+00:00")
-                        return date_stripped
-                    except ValueError as e_final:
-                        raise NotImplementedError("We are not accounting for dates of this format: {}".format(date_value)) from e_final
+                continue
 
-    # def timedelta_formatted(self, dtime, days=0):
-    #     try:
-    #         date_stripped = datetime.strptime(dtime, self.START_DATE_FORMAT)
-    #         return_date = date_stripped + timedelta(days=days)
-
-    #         return datetime.strftime(return_date, self.START_DATE_FORMAT)
-
-    #     except ValueError:
-    #         try:
-    #             date_stripped = datetime.strptime(dtime, self.BOOKMARK_COMPARISON_FORMAT)
-    #             return_date = date_stripped + timedelta(days=days)
-
-    #             return datetime.strftime(return_date, self.BOOKMARK_COMPARISON_FORMAT)
-
-    #         except ValueError:
-    #             return Exception("Datetime object is not of the format: {}".format(self.START_DATE_FORMAT))
+        raise NotImplementedError("Tests do not account for dates of this format: {}".format(date_value))
 
     def timedelta_formatted(self, dtime, dt_format, days=0):
         """

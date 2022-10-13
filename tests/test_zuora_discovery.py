@@ -1,12 +1,6 @@
-"""Test tap discovery mode and metadata/annotated-schema."""
-import re
-import unittest
-from tap_tester import menagerie, connections, LOGGER
-
+from tap_tester import menagerie, connections
 from base import ZuoraBaseTest
 
-import singer
-LOGGER = singer.get_logger()
 class DiscoveryTest(ZuoraBaseTest):
     """Test tap discovery mode and metadata/annotated-schema conforms to standards."""
 
@@ -14,11 +8,12 @@ class DiscoveryTest(ZuoraBaseTest):
     def name():
         return "tap_tester_zuora_discovery_rest"
 
-    def test_discovery(self):
-        self.discovery_test("REST")
-        self.discovery_test("AQUA")
+    def test_run(self):
+        """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
+        self.run_test("AQUA")
+        self.run_test("REST")
 
-    def discovery_test(self, api_type):
+    def run_test(self, api_type):
         """
         Verify that discover creates the appropriate catalog, schema, metadata, etc.
 
@@ -48,15 +43,6 @@ class DiscoveryTest(ZuoraBaseTest):
         self.assertSetEqual(streams_to_test, found_catalog_names)
         LOGGER.info("discovered schemas are OK")
 
-        # # NOTE: The following assertion is not backwards compatible with older taps, but it
-        # #       SHOULD BE IMPLEMENTED in future taps, leaving here as a comment for reference
-
-        # # Verify stream names follow naming convention
-        # # streams should only have lowercase alphas and underscores
-        # found_catalog_names = {c['tap_stream_id'] for c in found_catalogs}
-        # self.assertTrue(all([re.fullmatch(r"[a-z_]+",  name) for name in found_catalog_names]),
-        #                 msg="One or more streams don't follow standard naming")
-
         for stream in streams_to_test:
             with self.subTest(stream=stream):
                 catalog = next(iter([catalog for catalog in found_catalogs
@@ -67,18 +53,8 @@ class DiscoveryTest(ZuoraBaseTest):
                 expected_primary_keys = self.expected_primary_keys()[stream]
                 expected_replication_method = self.expected_replication_method()[stream]
                 expected_automatic_fields = expected_primary_keys | expected_replication_keys
-
-                # Few streams have updatedAt and TransactionDate both the fields and both are automatic 
-                # but updatedAt is the only field used as replication key
-                additional_automatic_field_in_streams = {'BookingTransaction','JournalEntryDetailRefundInvoicePayment',
-                'JournalEntryDetailPaymentApplication','JournalEntryDetailCreditBalanceAdjustment','JournalEntryDetailInvoiceItem',
-                'JournalEntryDetailCreditMemoApplicationItem','JournalEntryDetailCreditMemoItem','JournalEntryDetailPaymentApplicationItem',
-                'JournalEntryDetailRevenueEventItem','JournalEntryDetailRefundApplication','JournalEntryDetailRefundApplicationItem',
-                'JournalEntryDetailDebitMemoItem','JournalEntryDetailCreditTaxationItem','JournalEntryDetailInvoicePayment',
-                'JournalEntryDetailInvoiceAdjustment','JournalEntryDetailTaxationItem','JournalEntryDetailDebitTaxationItem',
-                'JournalEntryDetailInvoiceItemAdjustment'}
                 
-                if stream in additional_automatic_field_in_streams:
+                if stream in self.additional_automatic_field_in_streams:
                     expected_automatic_fields.add('TransactionDate')
 
                 # gather results
@@ -105,6 +81,7 @@ class DiscoveryTest(ZuoraBaseTest):
                 for md_entry in metadata:
                     if md_entry['breadcrumb'] != []:
                         actual_fields.append(md_entry['breadcrumb'][1])
+
                 # Verify there are no duplicate/conflicting metadata entries.
                 self.assertEqual(len(actual_fields), len(set(actual_fields)), msg = "duplicates in the metadata entries retrieved")
 
