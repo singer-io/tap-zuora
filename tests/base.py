@@ -249,14 +249,6 @@ class ZuoraBaseTest(unittest.TestCase):
             return self.rest_only_streams()
         return streams
 
-    # def child_streams(self):
-    #     """
-    #     Return a set of streams that are child streams
-    #     based on having foreign key metadata
-    #     """
-    #     return {stream for stream, metadata in self.expected_metadata().items()
-    #             if metadata.get(self.FOREIGN_KEYS)}
-
     def expected_primary_keys(self):
         """
         return a dictionary with key of table name
@@ -391,8 +383,6 @@ class ZuoraBaseTest(unittest.TestCase):
                 # Verify all fields within each selected stream are selected
                 for field, field_props in catalog_entry.get('annotated-schema').get('properties').items():
                     field_selected = field_props.get('selected')
-                    LOGGER.info("field_selected.......:%s",field_selected)
-                    print("field_selected.......",field_selected)
                     LOGGER.info("\tValidating selection on %s.%s: %s",
                                 cat['stream_name'], field, field_selected)
                     self.assertTrue(field_selected, msg="Field not selected.")
@@ -470,36 +460,49 @@ class ZuoraBaseTest(unittest.TestCase):
         Pass in string-formatted-datetime, parse the value, and return it as an unformatted datetime object.
         """
         try:
-            date_stripped = dt.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%fZ")
+            date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%fZ")
             return date_stripped
         except ValueError:
             try:
-                date_stripped = dt.strptime(date_value, "%Y-%m-%dT%H:%M:%SZ")
+                date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%SZ")
                 return date_stripped
             except ValueError:
                 try:
-                    date_stripped = dt.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%f+00:00")
+                    date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S.%f+00:00")
                     return date_stripped
                 except ValueError:
                     try:
-                        date_stripped = dt.strptime(date_value, "%Y-%m-%dT%H:%M:%S+00:00")
+                        date_stripped = datetime.strptime(date_value, "%Y-%m-%dT%H:%M:%S+00:00")
                         return date_stripped
                     except ValueError as e_final:
                         raise NotImplementedError("We are not accounting for dates of this format: {}".format(date_value)) from e_final
 
-    def timedelta_formatted(self, dtime, days=0):
-        try:
-            date_stripped = dt.strptime(dtime, self.START_DATE_FORMAT)
-            return_date = date_stripped + timedelta(days=days)
+    # def timedelta_formatted(self, dtime, days=0):
+    #     try:
+    #         date_stripped = datetime.strptime(dtime, self.START_DATE_FORMAT)
+    #         return_date = date_stripped + timedelta(days=days)
 
-            return dt.strftime(return_date, self.START_DATE_FORMAT)
+    #         return datetime.strftime(return_date, self.START_DATE_FORMAT)
+
+    #     except ValueError:
+    #         try:
+    #             date_stripped = datetime.strptime(dtime, self.BOOKMARK_COMPARISON_FORMAT)
+    #             return_date = date_stripped + timedelta(days=days)
+
+    #             return datetime.strftime(return_date, self.BOOKMARK_COMPARISON_FORMAT)
+
+    #         except ValueError:
+    #             return Exception("Datetime object is not of the format: {}".format(self.START_DATE_FORMAT))
+
+    def timedelta_formatted(self, dtime, dt_format, days=0):
+        """
+        Checking the datetime format is as per the expectation
+        Adding the lookback window days in the date given as an argument
+        """
+        try:
+            date_stripped = datetime.strptime(dtime, dt_format)
+            return_date = date_stripped + timedelta(days=days)
+            return datetime.strftime(return_date, dt_format)
 
         except ValueError:
-            try:
-                date_stripped = dt.strptime(dtime, self.BOOKMARK_COMPARISON_FORMAT)
-                return_date = date_stripped + timedelta(days=days)
-
-                return dt.strftime(return_date, self.BOOKMARK_COMPARISON_FORMAT)
-
-            except ValueError:
-                return Exception("Datetime object is not of the format: {}".format(self.START_DATE_FORMAT))
+            return Exception("Datetime object is not of the format: {}".format(dt_format))

@@ -1,13 +1,12 @@
-import unittest
 import datetime
 import dateutil.parser
 import pytz
+import copy
 
 from tap_tester import runner, menagerie, connections
 from singer.utils import strptime_to_utc
 
 from base import ZuoraBaseTest
-
 
 class ZuoraBookmarking(ZuoraBaseTest):
     @staticmethod
@@ -31,17 +30,15 @@ class ZuoraBookmarking(ZuoraBaseTest):
         value that is 1 day prior. This ensures the subsequent sync will replicate
         at least 1 record but, fewer records than the previous sync.
         """
-
-        stream_to_current_state = {stream : bookmark.get(self.expected_replication_keys()[stream].pop())
-                                   for stream, bookmark in current_state['bookmarks'].items()}
-        stream_to_calculated_state = {stream: "" for stream in expected_streams}
-
+        stream_to_calculated_state = copy.deepcopy(current_state)
         timedelta_by_stream = {stream: [1,0,0]  # {stream_name: [days, hours, minutes], ...}
                                for stream in expected_streams}
         timedelta_by_stream['Account'] = [0, 0, 2]
-
-        for stream, state in stream_to_current_state.items():
+        
+        for stream, bookmark in stream_to_calculated_state['bookmarks'].items() :
             days, hours, minutes = timedelta_by_stream[stream]
+            repl_key = list(self.expected_replication_keys()[stream])
+            state = bookmark[repl_key[0]]
 
             # convert state from string to datetime object
             state_as_datetime = dateutil.parser.parse(state)
@@ -49,24 +46,22 @@ class ZuoraBookmarking(ZuoraBaseTest):
             # convert back to string and format
             calculated_state = datetime.datetime.strftime(calculated_state_as_datetime, "%Y-%m-%dT%H:%M:%S.000000Z")
             stream_to_calculated_state[stream] = calculated_state
-
-        return stream_to_calculated_state
+            bookmark[repl_key[0]] = ""
+            bookmark[repl_key[0]] = calculated_state
+      
+        return stream_to_calculated_state["bookmarks"]
 
     def test_run(self) :        
-        #self.run_test("REST")
         self.run_test("AQUA")
+        self.run_test("REST")
 
     def run_test(self, api_type):
         self.zuora_api_type = api_type
 
         # Select only the expected streams tables
-        
-        #a1 ={'Account', 'Amendment', 'BillingRun', 'Export', 'Invoice', 'InvoiceItem', 'InvoiceSplitItem', 'InvoiceItemAdjustment'}
-        #a2 = {'StoredCredentialProfile', 'PaymentMethod'}
-        expected_streams = {'PaymentMethodTransactionLog', 'TaxationItem', 'RevenueScheduleItemCreditMemoItem', 
-        'RefundInvoicePayment', 'ProcessedUsage', 'OrderAction', 'JournalEntryDetailRefundApplicationItem', 'InvoiceAdjustment',
-        'PaymentGatewayReconciliationEventLog', 'BillingRun', 'CommunicationProfile', 'AchNocEventLog', 'Account'}
-        #self.expected_streams() #- a1 - a2
+        expected_streams = {'PaymentMethodTransactionLog', 'OrderAction', 'ContactSnapshot', 'Export'} 
+        # 'Export', 'Order', 'RatePlan', 'RatePlanCharge', 'RatePlanChargeTier', 'Account', 'Contact'}
+
         expected_replication_keys = self.expected_replication_keys()
         expected_replication_methods = self.expected_replication_method()
 
@@ -84,6 +79,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
         first_sync_record_count = self.run_and_verify_sync(conn_id)
         first_sync_records = runner.get_records_from_target_output()
         first_sync_bookmarks = menagerie.get_state(conn_id)
+        print("first_sync_bookmarks.......",first_sync_bookmarks)
 
         ##########################################################################
         # Update State Between Syncs
@@ -91,6 +87,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
 
         new_states = {'bookmarks': dict()}
         simulated_states = self.calculated_states_by_stream(first_sync_bookmarks, expected_streams)
+        print("simulated_states.....",simulated_states)
         for stream, new_state in simulated_states.items():
             new_states['bookmarks'][stream] = new_state
         menagerie.set_state(conn_id, new_states)
@@ -102,6 +99,9 @@ class ZuoraBookmarking(ZuoraBaseTest):
         second_sync_record_count = self.run_and_verify_sync(conn_id)
         second_sync_records = runner.get_records_from_target_output()
         second_sync_bookmarks = menagerie.get_state(conn_id)
+        
+        print("AFTERRR first_sync_bookmarks.......",first_sync_bookmarks)
+        print("second_sync_bookmarks.......",second_sync_bookmarks)
 
         ##########################################################################
         # Test By Stream
@@ -124,7 +124,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
                                             stream, {}).get('messages', [])
                                         if record.get('action') == 'upsert']
                 first_bookmark_key_value = first_sync_bookmarks.get('bookmarks', {stream: None}).get(stream)
-                second_bookmark_key_value = second_sync_bookmarks.get('bookmarks', {stream: None}).get(stream) 
+                second_bookmark_key_value = second_sync_bookmarks.get('bookmarks', {stream: None}).get(stream)
 
                 if expected_replication_method == self.INCREMENTAL :
                     # Collect information specific to incremental streams from syncs 1 & 2
@@ -135,14 +135,6 @@ class ZuoraBookmarking(ZuoraBaseTest):
                     second_bookmark_value_utc = self.convert_state_to_utc(second_bookmark_value)
                     simulated_bookmark_value = self.convert_state_to_utc(new_states['bookmarks'][stream][replication_key])                       
 
-                    # # Subtracting the days as per the lookback window value
-                    # if stream == 'emails' :
-                    #     simulated_bookmark_minus_lookback = self.timedelta_formatted(simulated_bookmark_value, self.BOOKMARK_COMPARISON_FORMAT, 
-                    #                             days=expected_email_lookback_window) 
-                    # elif stream == 'reviews' :
-                    #     simulated_bookmark_minus_lookback = self.timedelta_formatted(simulated_bookmark_value, self.BOOKMARK_COMPARISON_FORMAT,
-                    #                                                     days=expected_review_lookback_window)
-                    # else :
                     simulated_bookmark_minus_lookback = simulated_bookmark_value
 
                     # Verify the first sync sets a bookmark of the expected form
@@ -153,9 +145,9 @@ class ZuoraBookmarking(ZuoraBaseTest):
                     self.assertIsNotNone(second_bookmark_key_value)
                     self.assertIsNotNone(second_bookmark_value)
 
-                    # Verify the second sync bookmark is Equal to the first sync bookmark
-                    # assumes no changes to data during test
-                    self.assertEqual(second_bookmark_value, first_bookmark_value)
+                    # Verify the second sync bookmark is Greater than or Equal to the first sync bookmark
+                    # as data changes during test
+                    self.assertGreaterEqual(second_bookmark_value, first_bookmark_value)
 
                     for record in first_sync_messages:
                         # Verify the first sync bookmark value is the max replication key value for a given stream
