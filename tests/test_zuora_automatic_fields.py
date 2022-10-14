@@ -27,7 +27,7 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         expected_streams =  {'Export', 'Order', 'RatePlan', 'RatePlanCharge', 'RatePlanChargeTier', 'Account', 'Contact'}
 
         # Instantiate connection
-        conn_id = connections.ensure_connection(self)
+        conn_id = connections.ensure_connection(self, original_properties=False)
 
         # Run check mode
         found_catalogs = self.run_and_verify_check_mode(conn_id)

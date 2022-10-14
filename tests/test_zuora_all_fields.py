@@ -32,7 +32,7 @@ class ZuoraAllFields(ZuoraBaseTest):
         'RevenueEventItemInvoiceItem', 'RevenueScheduleItem', 'RevenueScheduleItemInvoiceItem'}
 
         expected_automatic_fields = self.expected_automatic_fields()
-        conn_id = connections.ensure_connection(self)
+        conn_id = connections.ensure_connection(self, original_properties=False)
 
         found_catalogs = self.run_and_verify_check_mode(conn_id)
 

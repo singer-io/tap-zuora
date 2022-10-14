@@ -80,7 +80,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
         expected_replication_keys = self.expected_replication_keys()
         expected_replication_methods = self.expected_replication_method()
 
-        conn_id = connections.ensure_connection(self)
+        conn_id = connections.ensure_connection(self, original_properties=False)
 
         # Run in check mode
         found_catalogs = self.run_and_verify_check_mode(conn_id)

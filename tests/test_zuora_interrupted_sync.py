@@ -1,4 +1,6 @@
 from datetime import datetime as dt
+from datetime import timedelta
+from singer import utils
 from tap_tester import runner, connections, menagerie
 from base import ZuoraBaseTest
 
@@ -32,11 +34,11 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         - Verify the yet-to-be-synced streams are replicated following the interrupted stream in the resuming sync.
         """
         self.zuora_api_type = api_type
-        self.start_date = "2022-10-01T00:00:00Z"
+        self.start_date = dt.strftime(utils.now() - timedelta(days=10), "%Y-%m-%dT00:00:00Z")
         start_date_datetime = dt.strptime(self.start_date, "%Y-%m-%dT%H:%M:%SZ")
         expected_streams = {'OrderAction', 'RevenueEventItem'}
 
-        conn_id = connections.ensure_connection(self)
+        conn_id = connections.ensure_connection(self, original_properties=False)
 
         # Run check mode
         found_catalogs = self.run_and_verify_check_mode(conn_id)
@@ -65,7 +67,7 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         #   subscriptions: remaining to sync
         state = {
             "current_stream": "OrderAction",
-            "bookmarks":{'RevenueEventItem': {'version': 1665422431, 'UpdatedDate': '2022-10-07T00:00:00Z'}}
+            "bookmarks":{'RevenueEventItem': {'version': 1665422431, 'UpdatedDate': dt.strftime(utils.now() - timedelta(days=5), "%Y-%m-%dT00:00:00Z")}}
         }
 
         # Set state for 2nd sync

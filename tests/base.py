@@ -25,6 +25,7 @@ class ZuoraBaseTest(unittest.TestCase):
     FULL_TABLE = "FULL_TABLE"
     OBEYS_START_DATE = "obey-start-date"
     zuora_api_type = ""
+    start_date = datetime.strftime(utils.now() - timedelta(days=3), "%Y-%m-%dT00:00:00Z")
 
     # Few streams have UpdatedAt and TransactionDate both the fields and both are automatic 
     # but updatedAt is the only field used as replication key
@@ -63,7 +64,7 @@ class ZuoraBaseTest(unittest.TestCase):
     def get_properties(self, original: bool = True):
         """Configuration of properties required for the tap."""
         return_value = {
-            'start_date' : datetime.strftime(utils.now() - timedelta(days=3), "%Y-%m-%dT00:00:00Z"),
+            'start_date' : self.start_date,
             'partner_id' : os.getenv('TAP_ZUORA_PARTNER_ID'),
             'api_type' : self.zuora_api_type,
             'sandbox' : 'true'
@@ -72,6 +73,7 @@ class ZuoraBaseTest(unittest.TestCase):
             return return_value
 
         return_value["start_date"] = self.start_date
+        return_value["api_type"] =  self.zuora_api_type
         return return_value
 
     def expected_metadata(self):

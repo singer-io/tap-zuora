@@ -36,7 +36,7 @@ class DiscoveryTest(ZuoraBaseTest):
 
         streams_to_test = self.expected_streams()
 
-        conn_id = connections.ensure_connection(self)
+        conn_id = connections.ensure_connection(self, original_properties=False)
 
         found_catalogs = self.run_and_verify_check_mode(conn_id)
 
