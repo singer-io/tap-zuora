@@ -1,5 +1,6 @@
 from base import ZuoraBaseTest
-
+from datetime import timedelta, datetime
+from singer import utils
 from tap_tester import connections, runner
 from tap_tester.logger import LOGGER
 
@@ -23,8 +24,8 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         • verify all data from later start data has bookmark values >= start_date
         """
         self.zuora_api_type = api_type
-        self.start_date_1 = "2022-09-29T00:00:00Z"
-        self.start_date_2 = "2022-10-10T00:00:00Z"
+        self.start_date_1 = datetime.strftime(utils.now() - timedelta(days=8), "%Y-%m-%dT00:00:00Z")
+        self.start_date_2 = datetime.strftime(utils.now() - timedelta(days=4), "%Y-%m-%dT00:00:00Z")
         
         self.start_date = self.start_date_1
 
@@ -79,7 +80,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         synced_records_2 = runner.get_records_from_target_output()
 
         for stream in expected_streams:
-            with self.subTest(stream=stream):
+            with self.subTest(stream=stream+'_'+api_type):
                 # Expected values
                 expected_primary_keys = self.expected_primary_keys()[stream]
                 expected_metadata = self.expected_metadata()[stream]
