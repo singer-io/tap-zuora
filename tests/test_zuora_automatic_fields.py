@@ -11,7 +11,7 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
     def test_run(self):
         """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
         self.run_test("AQUA")
-        self.run_test("REST")
+        # self.run_test("REST")
 
     def run_test(self, api_type):
         """
