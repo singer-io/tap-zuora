@@ -28,7 +28,7 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {'RefundTransactionLog', 'RevenueChargeSummaryItem', 'RevenueEventItem', 'RevenueScheduleItem'}
+        expected_streams = {'RefundTransactionLog', 'RevenueEventItem'}
 
         expected_automatic_fields = self.expected_automatic_fields()
         conn_id = connections.ensure_connection(self, original_properties=False)

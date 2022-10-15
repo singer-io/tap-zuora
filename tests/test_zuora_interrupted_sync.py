@@ -12,8 +12,8 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
 
     def test_run(self):
         """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
+        # Testing for only AQUA mode to reduce the execution time
         self.run_test("AQUA")
-        self.run_test("REST")
 
     def run_test(self, api_type):
         """

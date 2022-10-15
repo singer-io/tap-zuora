@@ -29,7 +29,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         
         self.start_date = self.start_date_1
 
-        expected_streams = {'PaymentMethodTransactionLog', 'Account'}
+        expected_streams = {'Account'}
 
         ##########################################################################
         # First Sync
