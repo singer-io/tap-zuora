@@ -25,14 +25,8 @@ def convert_legacy_state(catalog: Catalog, state: dict) -> dict:
     bookmarks key in non-empty state file."""
     new_state = {"bookmarks": {}, "current_stream": state.get("current_stream")}
     for stream in catalog.streams:
-        if (
-            stream.is_selected()
-            and stream.replication_key
-            and stream.tap_stream_id in state
-        ):
-            new_state["bookmarks"][stream.tap_stream_id][
-                stream.replication_key
-            ] = state[stream.tap_stream_id]
+        if stream.is_selected() and stream.replication_key and stream.tap_stream_id in state:
+            new_state["bookmarks"][stream.tap_stream_id] = state[stream.tap_stream_id]
 
     return new_state
 
@@ -93,15 +87,15 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
     return state
 
 
-def do_discover(client: Client, force_rest: bool = False):
+def do_discover(client: Client):
     """starts the Discover process."""
     LOGGER.info("Starting discover")
-    catalog = {"streams": discover_streams(client, force_rest)}
+    catalog = {"streams": discover_streams(client)}
     json.dump(catalog, sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
 
-def do_sync(client: Client, catalog: Catalog, state: dict, force_rest: bool = False):
+def do_sync(client: Client, catalog: Catalog, state: dict):
     """Starts the sync process for all the selected streams."""
     starting_stream = state.get("current_stream")
     if starting_stream:
@@ -128,7 +122,7 @@ def do_sync(client: Client, catalog: Catalog, state: dict, force_rest: bool = Fa
         state["current_stream"] = stream_name
         singer.write_state(state)
         singer.write_schema(stream_name, stream.schema.to_dict(), stream.key_properties)
-        counter = sync_stream(client, state, stream.to_dict(), force_rest)
+        counter = sync_stream(client, state, stream.to_dict())
 
         LOGGER.info(f"{stream_name}: Completed sync ({counter.value} rows)")
 
@@ -142,21 +136,16 @@ def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     client = Client.from_config(args.config)
-    force_rest = args.config.get("api_type") == "REST"
 
     # Using the AQuA API requires a Zuora Partner ID
-    if not force_rest:
-        partner_id = args.config.get("partner_id")
-        if not partner_id:
-            raise Exception(
-                "Config is missing required `partner_id` key when using the AQuA API"
-            )
+    if not client.is_rest and not client.partner_id:
+        raise Exception("Config is missing required `partner_id` key when using the AQuA API")
 
     if args.discover:
-        do_discover(client, force_rest)
+        do_discover(client)
     elif args.catalog:
         state = validate_state(args.config, args.catalog, args.state)
-        do_sync(client, args.catalog, state, force_rest)
+        do_sync(client, args.catalog, state)
 
 
 if __name__ == "__main__":

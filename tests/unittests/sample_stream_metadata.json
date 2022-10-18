@@ -1,0 +1,8 @@
+{"tap_stream_id": "Stream1", "schema": {"type": "object", "additionalProperties": false, "properties":
+            {"Field1": {"type": ["string", "null"]}, "UpdatedDate": {"type": ["string", "null"]},
+            "Id": {"type": ["integer"]}}}, "metadata": [{"breadcrumb": [], "metadata": {"table-key-properties": ["Id"],
+            "forced-replication-method": "INCREMENTAL", "valid-replication-keys": ["UpdatedDate"],
+            "inclusion": "available"}}, {"breadcrumb": ["properties", "Field1"], "metadata": {"inclusion": "available",
+            "selected": true}}, {"breadcrumb": ["properties", "Id"], "metadata": {"inclusion": "automatic"}},
+            {"breadcrumb": ["properties", "UpdatedDate"], "metadata": {"inclusion": "automatic"}}],
+                  "replication_key": "UpdatedDate"}
