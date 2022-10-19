@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects>
+    <object href="https://test.com/Stream1">
+        <name>Stream1</name>
+        <label>Stream 1</label>
+    </object>
+    <object href="https://test.com/Stream2">
+        <name>Stream2</name>
+        <label>Stream 2</label>
+    </object>
+    <object href="https://https://test.com/Stream3">
+        <name>Stream3</name>
+        <label>Stream 3</label>
+    </object>
+</objects>

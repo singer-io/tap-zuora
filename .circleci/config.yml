@@ -14,12 +14,19 @@ jobs:
             source /usr/local/share/virtualenvs/tap-zuora/bin/activate
             pip install .[dev]
             pyenv global 3.9.6
-      # - run:
-      #     name: 'pylint'
-      #     command: |
-      #       source /usr/local/share/virtualenvs/tap-zuora/bin/activate
-      #       pylint tap_zuora -d "$PYLINT_DISABLE_LIST,missing-docstring,line-too-long,too-many-locals,too-many-arguments,bad-whitespace,no-else-return,unused-argument"
+      - run:
+          name: 'pylint'
+          command: |
+            source /usr/local/share/virtualenvs/tap-zuora/bin/activate
+            pylint tap_zuora -d C,R,W
       - add_ssh_keys
+      - run:
+          name: 'Unit Tests'
+          command: |
+            source /usr/local/share/virtualenvs/tap-zuora/bin/activate
+            pip install nose coverage
+            nosetests --with-coverage --cover-erase --cover-package=tap_zuora --cover-html-dir=htmlcov tests/unittests
+            coverage html
       - run:
           name: 'Integration Tests'
           command: |

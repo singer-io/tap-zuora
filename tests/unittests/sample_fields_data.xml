@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<object href="https://test.com/Account">
+    <name>Stream1</name>
+    <label>Stream1</label>
+    <fields>
+        <field>
+            <name>Field1</name>
+            <label>Field 1</label>
+            <required>False</required>
+            <type>text</type>
+            <contexts>
+                <context>export</context>
+            </contexts>
+        </field>
+        <field>
+            <name>Id</name>
+            <label>Id</label>
+            <required>False</required>
+            <type>integer</type>
+            <contexts>
+                <context>export</context>
+            </contexts>
+        </field>
+        <field>
+            <name>Field3</name>
+            <label>Field 3</label>
+            <required>False</required>
+            <type>boolean</type>
+            <contexts>
+                <context>soap</context>
+            </contexts>
+        </field>
+        <field>
+            <name>UpdatedOn</name>
+            <label>UpdatedOn</label>
+            <required>False</required>
+            <type>text</type>
+            <contexts>
+                <context>export</context>
+            </contexts>
+        </field>
+    </fields>
+    <related-objects>
+        <object href="https://test.com/Contact">
+            <name>Stream3</name>
+            <label>Stream 3</label>
+        </object>
+    </related-objects>
+</object>
