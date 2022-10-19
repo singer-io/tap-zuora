@@ -18,7 +18,7 @@ jobs:
           name: 'pylint'
           command: |
             source /usr/local/share/virtualenvs/tap-zuora/bin/activate
-            pylint tap_zuora -d pylint tap_zuora -d C,R,W
+            pylint tap_zuora -d C,R,W
       - add_ssh_keys
       - run:
           name: 'Unit Tests'
