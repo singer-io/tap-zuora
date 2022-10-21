@@ -16,8 +16,8 @@ class ZuoraAllFields(ZuoraBaseTest):
 
     def test_run(self):
         """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""
-         # Testing for only REST mode to reduce the execution time
-        self.run_test("REST")
+         # Testing for only AQuA mode to reduce the execution time
+        self.run_test("AQUA")
 
     def run_test(self, api_type):
         """
@@ -28,7 +28,7 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {'RefundTransactionLog', 'RevenueEventItem'}
+        expected_streams = {'RefundTransactionLog', 'Account'}
 
         expected_automatic_fields = self.expected_automatic_fields()
         conn_id = connections.ensure_connection(self, original_properties=False)
