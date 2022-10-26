@@ -1,8 +1,3 @@
-import datetime
-import dateutil.parser
-import pytz
-import copy
-
 from singer.utils import strptime_to_utc
 from tap_tester import runner, menagerie, connections
 from base import ZuoraBaseTest
@@ -12,44 +7,6 @@ class ZuoraBookmarking(ZuoraBaseTest):
     @staticmethod
     def name():
         return "tap_tester_zuora_bookmarking"
-
-    @staticmethod
-    def convert_state_to_utc(date_str):
-        """
-        Convert a saved bookmark value of the form '2020-08-25T13:17:36-07:00' to
-        a string formatted utc datetime,
-        in order to compare aginast json formatted datetime values
-        """
-        date_object = dateutil.parser.parse(date_str)
-        date_object_utc = date_object.astimezone(tz=pytz.UTC)
-        return datetime.datetime.strftime(date_object_utc, "%Y-%m-%dT%H:%M:%SZ")
-
-    def calculated_states_by_stream(self, current_state, expected_streams):
-        """
-        Look at the bookmarks from a previous sync and set a new bookmark
-        value that is 1 day prior. This ensures the subsequent sync will replicate
-        at least 1 record but, fewer records than the previous sync.
-        """
-        stream_to_calculated_state = copy.deepcopy(current_state)
-        timedelta_by_stream = {stream: [1,0,0]  # {stream_name: [days, hours, minutes], ...}
-                               for stream in expected_streams}
-        timedelta_by_stream['Account'] = [0, 0, 2]
-        
-        for stream, bookmark in stream_to_calculated_state['bookmarks'].items() :
-            days, hours, minutes = timedelta_by_stream[stream]
-            repl_key = list(self.expected_replication_keys()[stream])
-            state = bookmark[repl_key[0]]
-
-            # convert state from string to datetime object
-            state_as_datetime = dateutil.parser.parse(state)
-            calculated_state_as_datetime = state_as_datetime - datetime.timedelta(days=days, hours=hours, minutes=minutes)
-            # convert back to string and format
-            calculated_state = datetime.datetime.strftime(calculated_state_as_datetime, "%Y-%m-%dT%H:%M:%S.000000Z")
-            stream_to_calculated_state[stream] = calculated_state
-            bookmark[repl_key[0]] = ""
-            bookmark[repl_key[0]] = calculated_state
-      
-        return stream_to_calculated_state["bookmarks"]
 
     def test_run(self) : 
         """ Executing tap-tester scenarios for both types of zuora APIs AQUA and REST"""       

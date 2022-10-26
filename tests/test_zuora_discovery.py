@@ -49,7 +49,9 @@ class DiscoveryTest(ZuoraBaseTest):
             with self.subTest(stream=stream):
                 catalog = next(iter([catalog for catalog in found_catalogs
                                      if catalog["stream_name"] == stream]))
-                assert catalog  # based on previous tests this should always be found
+                # based on previous tests this should always be found                     
+                self.assertIsNotNone(catalog)
+
                 # gather expectations
                 expected_replication_keys = self.expected_replication_keys()[stream]
                 expected_primary_keys = self.expected_primary_keys()[stream]
@@ -85,7 +87,8 @@ class DiscoveryTest(ZuoraBaseTest):
                         actual_fields.append(md_entry['breadcrumb'][1])
 
                 # Verify there are no duplicate/conflicting metadata entries.
-                self.assertEqual(len(actual_fields), len(set(actual_fields)), msg = "duplicates in the metadata entries retrieved")
+                self.assertEqual(len(actual_fields), len(set(actual_fields)), \
+                    msg = "duplicates in the metadata entries retrieved")
 
                 # verify replication key(s)
                 self.assertSetEqual(expected_replication_keys, actual_replication_keys)
@@ -94,7 +97,7 @@ class DiscoveryTest(ZuoraBaseTest):
                 self.assertSetEqual(expected_primary_keys, actual_primary_keys)
 
                 # verify the actual replication matches our expected replication method
-                self.assertEqual(expected_replication_method, actual_replication_method) # BUG_TDL-9711
+                self.assertEqual(expected_replication_method, actual_replication_method)
 
                 # verify that if there is a replication key we are doing INCREMENTAL otherwise FULL
                 if actual_replication_keys:

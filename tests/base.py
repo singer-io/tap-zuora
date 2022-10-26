@@ -1,5 +1,8 @@
 import os
 import unittest
+import dateutil.parser
+import pytz
+import copy
 from datetime import timedelta, datetime
 
 import singer
@@ -468,3 +471,79 @@ class ZuoraBaseTest(unittest.TestCase):
 
         except ValueError:
             return Exception("Datetime object is not of the format: {}".format(dt_format))
+
+    def convert_state_to_utc(self, date_str):
+        """
+        Convert a saved bookmark value of the form '2020-08-25T13:17:36-07:00' to
+        a string formatted utc datetime,
+        in order to compare aginast json formatted datetime values
+        """
+        date_object = dateutil.parser.parse(date_str)
+        date_object_utc = date_object.astimezone(tz=pytz.UTC)
+        return datetime.strftime(date_object_utc, "%Y-%m-%dT%H:%M:%SZ")
+
+    def calculated_states_by_stream(self, current_state, expected_streams):
+        """
+        Look at the bookmarks from a previous sync and set a new bookmark
+        value that is 1 day prior. This ensures the subsequent sync will replicate
+        at least 1 record but, fewer records than the previous sync.
+        """
+        stream_to_calculated_state = copy.deepcopy(current_state)
+        timedelta_by_stream = {stream: [1,0,0]  # {stream_name: [days, hours, minutes], ...}
+                               for stream in expected_streams}
+        timedelta_by_stream['Account'] = [0, 0, 2]
+        
+        for stream, bookmark in stream_to_calculated_state['bookmarks'].items() :
+            days, hours, minutes = timedelta_by_stream[stream]
+            repl_key = list(self.expected_replication_keys()[stream])
+            state = bookmark[repl_key[0]]
+
+            # convert state from string to datetime object
+            state_as_datetime = dateutil.parser.parse(state)
+            calculated_state_as_datetime = state_as_datetime - timedelta(days=days, hours=hours, minutes=minutes)
+            # convert back to string and format
+            calculated_state = datetime.strftime(calculated_state_as_datetime, "%Y-%m-%dT%H:%M:%S.000000Z")
+            stream_to_calculated_state[stream] = calculated_state
+            bookmark[repl_key[0]] = ""
+            bookmark[repl_key[0]] = calculated_state
+      
+        return stream_to_calculated_state["bookmarks"]
+
+    def get_mid_point_date(self, start_date, bookmark_date):
+        """
+        Function to find the middle date between two dates
+        """
+        date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+        start_date_dt = datetime.strptime(start_date, self.START_DATE_FORMAT)
+        bookmark_date_dt = datetime.strptime(bookmark_date, self.BOOKMARK_COMPARISON_FORMAT)
+        mid_date_dt = start_date_dt.date() + (bookmark_date_dt-start_date_dt) / 2
+        # Convert datetime object to string format
+        mid_date = mid_date_dt.strftime(date_format)
+        return mid_date
+
+    def is_incremental(self, stream):
+        """Checking if the given stream is incremental or not"""
+        return self.expected_metadata().get(stream).get(self.REPLICATION_METHOD) == self.INCREMENTAL
+
+    def create_interrupt_sync_state(self, state, interrupt_stream, pending_streams, start_date):
+        """
+        This function will create a new interrupt sync bookmark state
+        """
+        expected_replication_keys = self.expected_replication_keys()
+        bookmark_state = state['bookmarks']
+        if self.is_incremental(interrupt_stream):
+            replication_key = next(iter(expected_replication_keys[interrupt_stream]))
+            bookmark_date = bookmark_state[interrupt_stream][replication_key]
+            updated_bookmark_date = self.get_mid_point_date(start_date, bookmark_date)
+            bookmark_state[interrupt_stream][replication_key] = updated_bookmark_date
+        state["current_stream"] = interrupt_stream
+
+        # For pending streams, update the bookmark_value to start-date 
+        for stream in iter(pending_streams):
+            # Only incremental streams should have the bookmark value
+            if self.is_incremental(stream):
+                replication_key = next(iter(expected_replication_keys[stream]))
+                bookmark_state[stream][replication_key] = start_date
+            state["bookmarks"] = bookmark_state
+        
+        return state

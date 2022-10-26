@@ -1,7 +1,9 @@
 from datetime import datetime as dt
 from datetime import timedelta
+import copy
 from singer import utils
 from tap_tester import runner, connections, menagerie
+from tap_tester.logger import LOGGER
 from base import ZuoraBaseTest
 
 class ZuoraInterruptedSyncTest(ZuoraBaseTest):
@@ -35,8 +37,7 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         """
         self.zuora_api_type = api_type
         self.start_date = dt.strftime(utils.now() - timedelta(days=10), "%Y-%m-%dT00:00:00Z")
-        start_date_datetime = dt.strptime(self.start_date, "%Y-%m-%dT%H:%M:%SZ")
-        expected_streams = {'PaymentMethodTransactionLog'}
+        expected_streams = {'PaymentMethodTransactionLog', 'OrderAction', 'RatePlan'}
 
         conn_id = connections.ensure_connection(self, original_properties=False)
 
@@ -56,26 +57,31 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
             additional_md = []
             connections.select_catalog_and_fields_via_metadata(conn_id,catalog,annoted_schema,additional_md=additional_md,non_selected_fields=non_selected_properties)
 
-        # Run sync
-        record_count_by_stream_full_sync = self.run_and_verify_sync(conn_id)
-        synced_records_full_sync = runner.get_records_from_target_output()
-        full_sync_state = menagerie.get_state(conn_id)
+        # Run a first sync job using orchestrator
+        first_sync_record_count = self.run_and_verify_sync(conn_id)
+        first_sync_bookmarks = menagerie.get_state(conn_id)
+        
+        LOGGER.info(f"first_sync_record_count = {first_sync_record_count}")
 
-        # State to run 2nd sync
-        #   orders: currently syncing
-        #   charges: synced records successfully
-        #   subscriptions: remaining to sync
-        state = {
-            "current_stream": "OrderAction",
-            "bookmarks":{'RevenueEventItem': {'version': 1665422431, 'UpdatedDate': dt.strftime(utils.now() - timedelta(days=5), "%Y-%m-%dT00:00:00Z")}}
-        }
+        completed_streams = {'RatePlan'}
+        pending_streams = {'PaymentMethodTransactionLog'}
+        interrupt_stream = 'OrderAction'
 
-        # Set state for 2nd sync
-        menagerie.set_state(conn_id, state)
+        interrupted_sync_states = self.create_interrupt_sync_state(copy.deepcopy(first_sync_bookmarks), interrupt_stream, pending_streams, self.start_date)
+        menagerie.set_state(conn_id, interrupted_sync_states)
+        
+        LOGGER.info("Interrupted Bookmark - %s", interrupted_sync_states)
+
+        ##########################################################################
+        # Second Sync
+        ##########################################################################
+
+        second_sync_record_count = self.run_and_verify_sync(conn_id)
+        second_sync_records = runner.get_records_from_target_output()
+        second_sync_bookmarks = menagerie.get_state(conn_id)
+        LOGGER.info("second_sync_record_count = %s \n second_sync_bookmarks = %s", second_sync_record_count, second_sync_bookmarks)
 
         # Run sync after interruption
-        record_count_by_stream_interrupted_sync = self.run_and_verify_sync(conn_id)
-        synced_records_interrupted_sync = runner.get_records_from_target_output()
         final_state = menagerie.get_state(conn_id)
         currently_syncing = final_state.get('current_stream')
 
@@ -91,87 +97,67 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         # Stream level assertions
         for stream in expected_streams:
             with self.subTest(stream=stream):
-
-                # Gather expectations
+                # Expected values
                 expected_replication_method = self.expected_replication_method()[stream]
-                expected_replication_key = next(iter(self.expected_replication_keys()[stream]))
-                
-                # Gather actual results
-                full_records = [message['data'] for message in synced_records_full_sync.get(stream, {}).get('messages', [])]
-                full_record_count = record_count_by_stream_full_sync.get(stream, 0)
-                interrupted_records = [message['data'] for message in synced_records_interrupted_sync.get(stream, {}).get('messages', [])]
-                interrupted_record_count = record_count_by_stream_interrupted_sync.get(stream, 0)
+                replication_key = next(iter(self.expected_replication_keys()[stream]))
+
+                # Collect information for assertions from syncs 1 & 2 base on expected values
+                first_sync_count = first_sync_record_count.get(stream, 0)
+                second_sync_count = second_sync_record_count.get(stream, 0)
+                second_sync_messages = [record.get('data') for record in
+                                        second_sync_records.get(
+                                            stream, {}).get('messages', [])
+                                        if record.get('action') == 'upsert']
+                first_bookmark_value = first_sync_bookmarks.get('bookmarks', {stream: None}).get(stream)
+                second_bookmark_value = second_sync_bookmarks.get('bookmarks', {stream: None}).get(stream)
+                LOGGER.info("first_bookmark_value =%s \n second_bookmark_value =%s", first_bookmark_value, second_bookmark_value)
 
                 # Final bookmark after interrupted sync
                 final_stream_bookmark = final_state['bookmarks'][stream]
 
                 if expected_replication_method == self.INCREMENTAL:
-                    
-                    # Verify final bookmark value is not None
-                    self.assertIsNotNone(final_stream_bookmark)
+                    interrupted_bookmark_value = interrupted_sync_states['bookmarks'][stream]
+                    if stream in completed_streams:
+                        # Verify at least 1 record was replicated in the second sync
+                        self.assertGreaterEqual(second_sync_count,
+                                            1, 
+                                            msg="Incorrect bookmarking for {0}, at least one or more record should be replicated".format(stream))
 
-                    if stream == state['current_stream']:
+                    elif stream == interrupted_sync_states.get('current_stream', None):
+                        # For interrupted stream records sync count should be less equals
+                        self.assertLessEqual(second_sync_count,
+                                            first_sync_count,
+                                            msg="For interrupted stream - {0}, seconds sync record count should be lesser or equal to first sync".format(stream))
 
-                        # Check if the interrupted stream has a bookamrk written for it
-                        if state["bookmarks"].get(stream,None):        
-                            interrupted_stream_bookmark = state['bookmarks'][stream]
-                            interrupted_bookmark_datetime = dt.strptime(interrupted_stream_bookmark, "%Y-%m-%dT%H:%M:%S.%fZ")
-                        else:
-                            # Assign the start date to the interrupted stream
-                            interrupted_bookmark_datetime = start_date_datetime
-
-                        # - Verify resuming sync only replicates records with replication key values greater or
-                        #       equal to the state for streams that were replicated during the interrupted sync.
-                        # - Verify the interrupted sync replicates the expected record set all interrupted records are in full records
-                        for record in interrupted_records:
-                            rec_time = dt.strptime(record.get(expected_replication_key), "%Y-%m-%dT%H:%M:%S.%fZ")
-                            self.assertGreaterEqual(rec_time, interrupted_bookmark_datetime)
-
-                            self.assertIn(record, full_records, msg='Incremental table record in interrupted sync not found in full sync')
-
-                        # Record count for all streams of interrupted sync match expectations
-                        full_records_after_interrupted_bookmark = 0
-                        for record in full_records:
-                            rec_time = dt.strptime(record.get(expected_replication_key), "%Y-%m-%dT%H:%M:%S.%fZ")
-                            if rec_time >= interrupted_bookmark_datetime:
-                                full_records_after_interrupted_bookmark += 1
-
-                        self.assertEqual(full_records_after_interrupted_bookmark, interrupted_record_count, \
-                                         msg='Expected {} records in each sync'.format(full_records_after_interrupted_bookmark))
+                    elif stream in pending_streams:
+                        # First sync and second sync record count match
+                        self.assertGreaterEqual(second_sync_count,
+                                                first_sync_count,
+                                                msg="For pending sync streams - {0}, second sync record count should be more than or equal to first sync".format(stream))     
 
                     else:
-                        # Get the date to start 2nd sync for non-interrupted streams
-                        synced_stream_bookmark = state['bookmarks'].get(stream)
-                        if synced_stream_bookmark:
-                            synced_stream_datetime = dt.strptime(synced_stream_bookmark[expected_replication_key], "%Y-%m-%dT%H:%M:%SZ")
-                        else:
-                            synced_stream_datetime = start_date_datetime
+                        raise Exception("Invalid state of stream {0} in interrupted state, please update appropriate state for the stream".format(stream))
 
-                        # Verify we replicated some records for the non-interrupted streams
-                        self.assertGreater(interrupted_record_count, 0)
+                    for record in second_sync_messages:
+                        # Verify the second sync replication key value is Greater or Equal to the first sync bookmark
+                        replication_key_value = record.get(replication_key)
 
-                        # - Verify resuming sync only replicates records with replication key values greater or equal to
-                        #       the state for streams that were replicated during the interrupted sync.
-                        # - Verify resuming sync replicates all records that were found in the full sync (non-interupted)
-                        for record in interrupted_records:
-                            rec_time = dt.strptime(record.get(expected_replication_key), "%Y-%m-%dT%H:%M:%S.%fZ")
-                            self.assertGreaterEqual(rec_time, synced_stream_datetime)
+                        self.assertLessEqual(interrupted_bookmark_value[replication_key],
+                                            replication_key_value,
+                                            msg="Interrupt bookmark was set incorrectly, a record with a lesser replication-key value was synced compared to interrupt bookmark value. Record = {}".format(record))
 
-                            self.assertIn(record, full_records, msg='Unexpected record replicated in resuming sync.')
-
-                        # Verify we replicated all the records from 1st sync for the streams
-                        #       that are left to sync (ie. streams without bookmark in the state)
-                        if stream not in state["bookmarks"].keys():
-                            for record in full_records:
-                                self.assertIn(record, interrupted_records, msg='Record missing from resuming sync.' )
-
+                        # Verify the second sync bookmark value is the max replication key value for a given stream
+                        self.assertLessEqual(replication_key_value,
+                                            second_bookmark_value[replication_key],
+                                            msg="Second sync bookmark was set incorrectly, a record with a greater replication-key value was synced. Record = {}".format(record))
                 elif expected_replication_method == self.FULL_TABLE:
+                    # Verify the syncs do not set a bookmark for full table streams
+                    self.assertIsNone(first_bookmark_value)
+                    self.assertIsNone(second_bookmark_value)
 
-                    # Verify full table streams do not save bookmarked values at the conclusion of a successful sync
-                    self.assertNotIn(stream, full_sync_state['bookmarks'].keys())
-                    self.assertNotIn(stream, final_state['bookmarks'].keys())
-
-                    # Verify first and second sync have the same records
-                    self.assertEqual(full_record_count, interrupted_record_count)
-                    for rec in interrupted_records:
-                        self.assertIn(rec, full_records, msg='full table record in interrupted sync not found in full sync')
+                    # Verify the number of records in the second sync is the same as the first
+                    self.assertEqual(second_sync_count, first_sync_count)
+                else:
+                    raise NotImplementedError("INVALID EXPECTATIONS\t\tSTREAM: {} REPLICATION_METHOD: {}" \
+                        .format(stream,
+                               expected_replication_method))
