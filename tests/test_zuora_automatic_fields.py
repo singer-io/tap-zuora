@@ -23,7 +23,7 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         that 251 (or more) records have been posted for that stream.
         """
         self.zuora_api_type = api_type
-        expected_streams =  {'Export', 'RatePlan', 'Account'}
+        expected_streams =  {'Export', 'RatePlan'}
 
         # Instantiate connection
         conn_id = connections.ensure_connection(self, original_properties=False)
