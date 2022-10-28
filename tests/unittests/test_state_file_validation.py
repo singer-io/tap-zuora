@@ -1,6 +1,6 @@
 import unittest
 from unittest import mock
-from typing import Dict, List, Union
+from typing import Dict, List
 from singer.catalog import Catalog, CatalogEntry
 from tap_zuora import validate_state, convert_legacy_state
 

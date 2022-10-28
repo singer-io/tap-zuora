@@ -73,13 +73,22 @@ entries.
   },
 ]
 ```
-
+Optionally, also create a state.json file. current_stream is an optional attribute used for identifying the last object to be synced in case the job is interrupted mid-stream. The next run would begin where the last job left off.
+```json
+{
+  "current_stream": "Account",
+  "bookmarks": {
+    "AchNocEventLog": {"UpdatedOn": "2022-10-15T00:00:00Z"},
+    "PaymentMethodTransactionLog": {"TransactionDate": "2022-10-15T00:00:00Z"}
+  }
+}
+```
 ### Sync mode
 
 With a `catalog.json` that describes field and table selections, the tap can be invoked in sync mode:
 
 ```bash
-$ tap-zuora --config config.json --catalog catalog.json
+$ tap-zuora --config config.json --catalog catalog.json --state state.json
 ```
 
 Messages are written to standard output following the Singer specification. The
