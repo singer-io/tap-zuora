@@ -89,16 +89,17 @@ class Client:  # pylint: disable=too-many-instance-attributes
                 )
                 if resp.status_code == 200:
                     resp_json = resp.json()
-                    # Checks whether there is an error in http response
-                    if "errorCode" not in resp_json:
-                        delete_id = resp_json["id"]
-                        delete_url = f"{url_prefix}v1/batch-query/jobs/{delete_id}"
-                        self._retryable_request(
-                            "DELETE", delete_url, auth=self.aqua_auth
-                        )
-                    else:
-                        LOGGER.error(resp_json.get("message"))
+                    if "errorCode" in resp_json:
+                        # Zuora sends 200 status code for an unrecognized partner ID in AQuA calls.
+                        raise Exception(resp_json.get("message", "Partner ID is not recognized."
+                                                              " To obtain a partner ID,"
+                                                              " submit a request with Zuora Global Support"))
 
+                    delete_id = resp_json["id"]
+                    delete_url = f"{url_prefix}v1/batch-query/jobs/{delete_id}"
+                    self._retryable_request(
+                        "DELETE", delete_url, auth=self.aqua_auth
+                    )
             if resp.status_code == 401:
                 continue
             else:
