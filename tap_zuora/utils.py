@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 
 
-def make_payload(project: str, query: str, partner_id: str, deleted: Optional[bool] = False) -> Dict:
+def make_aqua_payload(project: str, query: str, partner_id: str, deleted: Optional[bool] = False) -> Dict:
     # NB - 4/5/19 - Were told by zuora support to use the same value
     # for both project and name to imply an incremental export
     rtn = {
