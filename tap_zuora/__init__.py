@@ -52,7 +52,7 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
                 state["current_stream"] = None
             continue
 
-        if stream.tap_stream_id not in state["bookmarks"] or not state["bookmarks"][stream.tap_stream_id].get('version'):
+        if stream.tap_stream_id not in state["bookmarks"]:
             LOGGER.info(f"Initializing state for {stream.tap_stream_id}")
             singer.write_bookmark(
                 state, stream.tap_stream_id, "version", int(time.time())
@@ -140,7 +140,6 @@ def main():
     elif args.catalog:
         LOGGER.info(f'This connection is currently using {"REST " if client.is_rest else "AQuA "}API')
         state = validate_state(args.config, args.catalog, args.state)
-        LOGGER.info(state)
         do_sync(client, args.catalog, state)
 
 

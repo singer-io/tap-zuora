@@ -126,8 +126,9 @@ class Aqua:
     @staticmethod
     def get_payload(state: Dict, stream: Dict, partner_id: str) -> Dict:
         stream_name = stream["tap_stream_id"]
-        version = state["bookmarks"][stream["tap_stream_id"]]["version"]
+        version = state["bookmarks"][stream["tap_stream_id"]].get("version")
         project = f"{stream_name}_{version}"
+        LOGGER.info(f"project name is {project}")
         query = Aqua.get_query(stream)
         deleted = Aqua.deleted_records_available(stream)
         payload = make_aqua_payload(project, query, partner_id, deleted)
