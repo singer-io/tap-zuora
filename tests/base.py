@@ -196,7 +196,9 @@ class ZuoraBaseTest(unittest.TestCase):
             "PaymentMethodTransactionLog": incremental_transaction_date,
             "PaymentTransactionLog": incremental_transaction_date,
             "CalloutHistory": default_full,
-            "EmailHistory": default_full
+            "EmailHistory": default_full,
+            "Fulfillment": incremental_updated_date,
+            "FulfillmentItem": incremental_updated_date
 }
 
     def rest_only_streams(self):
@@ -269,7 +271,9 @@ class ZuoraBaseTest(unittest.TestCase):
             "PaymentTransactionLog",
             "PaymentMethodTransactionLog",
             "CalloutHistory",
-            "EmailHistory"
+            "EmailHistory",
+            "Fulfillment",
+            "FulfillmentItem"
         }
 
     def expected_streams(self):
