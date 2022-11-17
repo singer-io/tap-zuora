@@ -1,12 +1,16 @@
 import unittest
 from unittest import mock
-from typing import Dict, List, Union
+from typing import Dict, List
 from singer.catalog import Catalog, CatalogEntry
 from tap_zuora import validate_state, convert_legacy_state
 
 
 class Schema:
-    selected = True
+    def __init__(self, is_selected):
+        self.selected = is_selected
+
+    def selected(self):
+        return self.selected
 
 
 class CatalogProperties:
@@ -21,7 +25,7 @@ class CatalogProperties:
                           'metadata': {'table-key-properties': ['Id'], 'forced-replication-method': 'INCREMENTAL',
                                        'valid-replication-keys': ['UpdatedOn'], 'inclusion': 'available',
                                        'selected': is_selected}}]
-        self.schema = Schema
+        self.schema = Schema(is_selected)
 
 
 def mock_catalog_entry(streams: List[Dict]) -> List:

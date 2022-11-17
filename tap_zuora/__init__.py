@@ -31,11 +31,6 @@ def convert_legacy_state(catalog: Catalog, state: dict) -> dict:
     return new_state
 
 
-def stream_is_selected(mdata: dict) -> bool:
-    """check whether a stream is selected returns boolean value."""
-    return mdata.get((), {}).get("selected", False)
-
-
 def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
     """Validates the state file Sets the bookmark value for each selected
     stream as start_date if bookmark value is None or not available Sets the
@@ -47,13 +42,12 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
         else:
             LOGGER.info("No bookmarks found")
             state["bookmarks"] = {}
-
     if "current_stream" not in state:
         LOGGER.info("Current stream not found")
         state["current_stream"] = None
 
     for stream in catalog.streams:
-        if not stream_is_selected(metadata.to_map(stream.metadata)):
+        if not stream.is_selected():
             if state["current_stream"] == stream.tap_stream_id:
                 state["current_stream"] = None
             continue
@@ -105,7 +99,7 @@ def do_sync(client: Client, catalog: Catalog, state: dict):
 
     for stream in catalog.streams:
         stream_name = stream.tap_stream_id
-        if not stream_is_selected(metadata.to_map(stream.metadata)):
+        if not stream.is_selected():
             LOGGER.info(f"{stream_name}: Skipping - not selected")
             continue
 
@@ -144,6 +138,7 @@ def main():
     if args.discover:
         do_discover(client)
     elif args.catalog:
+        LOGGER.info(f'This connection is currently using {"REST " if client.is_rest else "AQuA "}API')
         state = validate_state(args.config, args.catalog, args.state)
         do_sync(client, args.catalog, state)
 

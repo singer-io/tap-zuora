@@ -6,7 +6,7 @@ from singer import metadata
 
 from tap_zuora.exceptions import ApiException
 from tap_zuora.client import Client
-from tap_zuora.utils import make_payload
+from tap_zuora.utils import make_aqua_payload
 
 MAX_EXPORT_DAYS = 30
 SYNTAX_ERROR = "There is a syntax error in one of the queries in the AQuA input"
@@ -126,11 +126,11 @@ class Aqua:
     @staticmethod
     def get_payload(state: Dict, stream: Dict, partner_id: str) -> Dict:
         stream_name = stream["tap_stream_id"]
-        version = state["bookmarks"][stream["tap_stream_id"]]["version"]
+        version = state["bookmarks"][stream["tap_stream_id"]].get("version")
         project = f"{stream_name}_{version}"
         query = Aqua.get_query(stream)
         deleted = Aqua.deleted_records_available(stream)
-        payload = make_payload(project, query, partner_id, deleted)
+        payload = make_aqua_payload(project, query, partner_id, deleted)
 
         if stream.get("replication_key"):
             # Incremental time must be in Pacific time
@@ -187,7 +187,7 @@ class Aqua:
         """
         endpoint = "v1/batch-query/"
         query = f"select * from {stream_name} limit 1"
-        payload = make_payload("discover", query, client.partner_id)
+        payload = make_aqua_payload("discover", query, client.partner_id)
         resp = client.aqua_request("POST", endpoint, json=payload).json()
 
         # Cancel this job to keep concurrency low.
