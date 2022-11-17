@@ -4,7 +4,7 @@
   * Makes a non-exportable field as unsupported in catalog file during discovery phase [#68](https://github.com/singer-io/tap-zuora/pull/68)
   * Updates the `DELETE_NOT_SUPPORTED` streams for AQuA Api calls [#68](https://github.com/singer-io/tap-zuora/pull/68)
   * Handles non-200 and non-retryable exceptions [#68](https://github.com/singer-io/tap-zuora/pull/68)
-  * Replaces `get_children` XML function with list iterator to support python version upgrade [#68](https://github.com/singer-io/tap-zuora/pull/68)
+  * Replaces `get_children` XML function with list iterator to make the tap compatible with python v3.9.6 [#68](https://github.com/singer-io/tap-zuora/pull/68)
   * Adds missing integration tests [#67](https://github.com/singer-io/tap-zuora/pull/67)
 
 ## 1.3.4
