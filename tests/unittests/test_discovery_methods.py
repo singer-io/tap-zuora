@@ -46,7 +46,6 @@ class TestDiscoveryMethods(unittest.TestCase):
         with p.open('r') as f:
             mock_rest_request.return_value = get_response(200, {}, False, f.read())
         expected_response = ['Stream1', 'Stream2', 'Stream3']
-        print(discover.discover_stream_names(client_object))
         self.assertEqual(discover.discover_stream_names(client_object), expected_response)
 
     @mock.patch('tap_zuora.client.Client.rest_request')
