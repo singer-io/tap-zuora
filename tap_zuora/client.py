@@ -1,12 +1,16 @@
 from typing import Dict, Tuple
+
 import backoff
 import requests
 import singer
 from singer import metrics
 
-from tap_zuora.exceptions import ApiException, \
-    RateLimitException, RetryableException, BadCredentialsException
-
+from tap_zuora.exceptions import (
+    ApiException,
+    BadCredentialsException,
+    RateLimitException,
+    RetryableException,
+)
 from tap_zuora.utils import make_aqua_payload
 
 IS_AQUA = False
@@ -33,13 +37,13 @@ LOGGER = singer.get_logger()
 
 class Client:  # pylint: disable=too-many-instance-attributes
     def __init__(
-            self,
-            username: str,
-            password: str,
-            partner_id: str,
-            sandbox: bool = False,
-            european: bool = False,
-            is_rest: bool = False
+        self,
+        username: str,
+        password: str,
+        partner_id: str,
+        sandbox: bool = False,
+        european: bool = False,
+        is_rest: bool = False,
     ):
         self.username = username
         self.password = password
@@ -51,9 +55,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
 
         self.base_url = self.get_url()
 
-        adapter = requests.adapters.HTTPAdapter(
-            max_retries=5
-        )  # Try again in the case the TCP socket closes
+        adapter = requests.adapters.HTTPAdapter(max_retries=5)  # Try again in the case the TCP socket closes
         self._session.mount("https://", adapter)
 
     @staticmethod
@@ -63,20 +65,24 @@ class Client:  # pylint: disable=too-many-instance-attributes
         partner_id = config.get("partner_id", None)
         is_rest = config.get("api_type") == "REST"
         return Client(
-            config["username"], config["password"], partner_id, sandbox, european, is_rest
+            config["username"],
+            config["password"],
+            partner_id,
+            sandbox,
+            european,
+            is_rest,
         )
 
     def get_url(self) -> str:
-        """
-        gets the base_url from potential_urls based on configurations
-        """
+        """gets the base_url from potential_urls based on configurations."""
         potential_urls = URLS[(self.sandbox, self.european)]
         stream_name = "Account"
         for url_prefix in potential_urls:
             if self.is_rest:
                 resp = self._retryable_request(
                     "GET",
-                    f"{url_prefix}v1/describe/{stream_name}", url_check=True,
+                    f"{url_prefix}v1/describe/{stream_name}",
+                    url_check=True,
                     headers=self.rest_headers,
                 )
 
@@ -84,22 +90,23 @@ class Client:  # pylint: disable=too-many-instance-attributes
                 query = f"select * from {stream_name} limit 1"
                 post_url = f"{url_prefix}v1/batch-query/"
                 payload = make_aqua_payload("discover", query, self.partner_id)
-                resp = self._retryable_request(
-                    "POST", post_url, url_check=True, auth=self.aqua_auth, json=payload
-                )
+                resp = self._retryable_request("POST", post_url, url_check=True, auth=self.aqua_auth, json=payload)
                 if resp.status_code == 200:
                     resp_json = resp.json()
                     if "errorCode" in resp_json:
                         # Zuora sends 200 status code for an unrecognized partner ID in AQuA calls.
-                        raise Exception(resp_json.get("message", "Partner ID is not recognized."
-                                                              " To obtain a partner ID,"
-                                                              " submit a request with Zuora Global Support"))
+                        raise Exception(
+                            resp_json.get(
+                                "message",
+                                "Partner ID is not recognized."
+                                " To obtain a partner ID,"
+                                " submit a request with Zuora Global Support",
+                            )
+                        )
 
                     delete_id = resp_json["id"]
                     delete_url = f"{url_prefix}v1/batch-query/jobs/{delete_id}"
-                    self._retryable_request(
-                        "DELETE", delete_url, auth=self.aqua_auth
-                    )
+                    self._retryable_request("DELETE", delete_url, auth=self.aqua_auth)
             if resp.status_code == 401:
                 continue
             else:
@@ -118,9 +125,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
 
     @property
     def rest_headers(self) -> Dict:
-        """
-        Returns headers for HTTP request
-        """
+        """Returns headers for HTTP request."""
         return {
             "apiAccessKeyId": self.username,
             "apiSecretAccessKey": self.password,
@@ -137,9 +142,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         factor=30,
         jitter=None,
     )
-    def _retryable_request(
-            self, method: str, url: str, stream=False, url_check=False, **kwargs
-    ) -> requests.Response:
+    def _retryable_request(self, method: str, url: str, stream=False, url_check=False, **kwargs) -> requests.Response:
         """
         Performs HTTP request
         Retries the request for 5 times upon encountering exception
@@ -168,8 +171,11 @@ class Client:  # pylint: disable=too-many-instance-attributes
         """
         # If condition skip raising 400 exception when we test for stream availability
         # When some Stream is not available then api returns a 400 error with message noSuchDataSource
-        if not url_check and resp.status_code == 400 \
-                and 'noSuchDataSource' in resp.json().get('Errors', [{'Message': ''}])[0]['Message']:
+        if (
+            not url_check
+            and resp.status_code == 400
+            and "noSuchDataSource" in resp.json().get("Errors", [{"Message": ""}])[0]["Message"]
+        ):
             return
 
         if not url_check:
@@ -193,6 +199,3 @@ class Client:  # pylint: disable=too-many-instance-attributes
         with metrics.http_request_timer(path):
             url = self.base_url + path
             return self._request(method, url, headers=self.rest_headers, **kwargs)
-
-
-

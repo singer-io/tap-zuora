@@ -3,7 +3,7 @@ import sys
 import time
 
 import singer
-from singer import Catalog, metadata
+from singer import Catalog
 
 from tap_zuora.client import Client
 from tap_zuora.discover import discover_streams
@@ -54,9 +54,7 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
 
         if stream.tap_stream_id not in state["bookmarks"]:
             LOGGER.info(f"Initializing state for {stream.tap_stream_id}")
-            singer.write_bookmark(
-                state, stream.tap_stream_id, "version", int(time.time())
-            )
+            singer.write_bookmark(state, stream.tap_stream_id, "version", int(time.time()))
 
         if not stream.replication_key:
             continue
@@ -66,10 +64,7 @@ def validate_state(config: dict, catalog: Catalog, state: dict) -> dict:
             or state["bookmarks"][stream.tap_stream_id][stream.replication_key] is None
         ):
             LOGGER.info(
-                f'Setting start date for '
-                f'{stream.tap_stream_id} to '
-                f'{config["start_date"]}',
-
+                f"Setting start date for " f"{stream.tap_stream_id} to " f'{config["start_date"]}',
             )
             singer.write_bookmark(
                 state,

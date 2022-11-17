@@ -4,8 +4,8 @@ import pendulum
 import singer
 from singer import metadata
 
-from tap_zuora.exceptions import ApiException
 from tap_zuora.client import Client
+from tap_zuora.exceptions import ApiException
 from tap_zuora.utils import make_aqua_payload
 
 MAX_EXPORT_DAYS = 30
@@ -40,12 +40,8 @@ def joined_fields(fields: List, stream: Dict) -> List:
     mdata = metadata.to_map(stream["metadata"])
     joined_fields_list = []
     for field_name in fields:
-        if joined_obj := metadata.get(
-            mdata, ("properties", field_name), "tap-zuora.joined_object"
-        ):
-            joined_fields_list.append(
-                f"{joined_obj}." + field_name.replace(joined_obj, "")
-            )
+        if joined_obj := metadata.get(mdata, ("properties", field_name), "tap-zuora.joined_object"):
+            joined_fields_list.append(f"{joined_obj}." + field_name.replace(joined_obj, ""))
 
         else:
             joined_fields_list.append(field_name)
@@ -53,9 +49,7 @@ def joined_fields(fields: List, stream: Dict) -> List:
 
 
 def format_datetime_zoql(datetime_str: str, date_format: str):
-    return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(
-        date_format
-    )
+    return pendulum.parse(datetime_str, tz=pendulum.timezone("UTC")).strftime(date_format)
 
 
 class ExportFailed(Exception):
@@ -64,9 +58,7 @@ class ExportFailed(Exception):
 
 class ExportTimedOut(ExportFailed):
     def __init__(self, timeout: int, unit: str):
-        super().__init__(
-            f"Export failed (TimedOut): The job took longer than {timeout} {unit}"
-        )
+        super().__init__(f"Export failed (TimedOut): The job took longer than {timeout} {unit}")
 
 
 class Aqua:
@@ -135,9 +127,7 @@ class Aqua:
         if stream.get("replication_key"):
             # Incremental time must be in Pacific time
             # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/e_Post_Query_with_Retrieval_Time#Request_Parameters
-            start_date = state["bookmarks"][stream["tap_stream_id"]][
-                stream["replication_key"]
-            ]
+            start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
             inc_pen = pendulum.parse(start_date)
             inc_pen = inc_pen.astimezone(pendulum.timezone("US/Pacific"))
             payload["incrementalTime"] = inc_pen.strftime(Aqua.PARAMETER_DATE_FORMAT)
@@ -155,20 +145,14 @@ class Aqua:
         # Log to show whether the aqua request should trigger a full or
         # incremental response based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
-        payload_content = {
-            k: v
-            for k, v in payload.items()
-            if k in {"partner", "project", "incrementalTime"}
-        }
+        payload_content = {k: v for k, v in payload.items() if k in {"partner", "project", "incrementalTime"}}
         LOGGER.info(f"Submitting aqua request with {payload_content}")
         resp = client.aqua_request("POST", endpoint, json=payload).json()
         # Log to show whether the aqua response is in full or incremental
         # mode based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
         if "batches" in resp:
-            LOGGER.info(
-                f"Received aqua response with batch fulls={[x.get('full', None) for x in resp['batches']]}"
-            )
+            LOGGER.info(f"Received aqua response with batch fulls={[x.get('full', None) for x in resp['batches']]}")
         else:
             LOGGER.info("Received aqua response with no batches")
         if "message" in resp:
@@ -241,9 +225,7 @@ class Rest:
         }
 
     @staticmethod
-    def get_query(
-        stream: Dict, start_date: Union[str, None], end_date: Union[str, None]
-    ) -> str:
+    def get_query(stream: Dict, start_date: Union[str, None], end_date: Union[str, None]) -> str:
         selected_field_names = selected_fields(stream)
         dotted_field_names = joined_fields(selected_field_names, stream)
         fields = ", ".join(dotted_field_names)
@@ -259,9 +241,7 @@ class Rest:
         return query
 
     @staticmethod
-    def get_payload(
-        stream: Dict, start_date: Union[str, None], end_date: Union[str, None]
-    ) -> Dict:
+    def get_payload(stream: Dict, start_date: Union[str, None], end_date: Union[str, None]) -> Dict:
         query = Rest.get_query(stream, start_date, end_date)
         return Rest.make_payload(query)
 
@@ -311,9 +291,7 @@ class Rest:
         try:
             resp = client.rest_request("POST", endpoint, json=payload).json()
         except ApiException:
-            LOGGER.info(
-                f"Error probing status for stream {stream_name}, assuming unavailable"
-            )
+            LOGGER.info(f"Error probing status for stream {stream_name}, assuming unavailable")
             return "unavailable"
 
         return "available" if resp["Success"] else "unavailable"
