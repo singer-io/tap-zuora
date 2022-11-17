@@ -66,20 +66,18 @@ class DiscoveryTest(ZuoraBaseTest):
                 metadata = schema_and_metadata["metadata"]
                 schema = schema_and_metadata["annotated-schema"]
                 stream_properties = [item for item in metadata if item.get("breadcrumb") == []]
-                actual_replication_keys = set(stream_properties[0].get(
-                    "metadata", {self.REPLICATION_KEYS: []}).get(self.REPLICATION_KEYS, [])
-                )
-                actual_primary_keys = set(stream_properties[0].get(
-                    "metadata", {self.PRIMARY_KEYS: []}).get(self.PRIMARY_KEYS, [])
-                )
-                actual_replication_method = stream_properties[0].get(
-                    "metadata", {self.REPLICATION_METHOD: None}).get(self.REPLICATION_METHOD)
+                actual_replication_keys = set(stream_properties[0].get("metadata", \
+                    {self.REPLICATION_KEYS: []}).get(self.REPLICATION_KEYS, []))
+                actual_primary_keys = set(stream_properties[0].get("metadata", \
+                    {self.PRIMARY_KEYS: []}).get(self.PRIMARY_KEYS, []))
+                actual_replication_method = stream_properties[0].get("metadata", \
+                    {self.REPLICATION_METHOD: None}).get(self.REPLICATION_METHOD)
 
 
                 # verify there is only 1 top level breadcrumb
                 self.assertTrue(len(stream_properties) == 1,
                                 msg="There is NOT only one top level breadcrumb for {}".format(stream) + \
-                                "\nstream_properties | {}".format(stream_properties))
+                                "\n stream_properties | {}".format(stream_properties))
 
                 actual_fields = []
                 for md_entry in metadata:
@@ -88,7 +86,8 @@ class DiscoveryTest(ZuoraBaseTest):
 
                 # Verify there are no duplicate/conflicting metadata entries.
                 self.assertEqual(len(actual_fields), len(set(actual_fields)), \
-                    msg = "duplicates in the metadata entries retrieved")
+                                 msg = "duplicates in the metadata entries retrieved : \
+                                 {set([x for x in actual_fields if actual_fields.count(x) > 1])}")
 
                 # verify replication key(s)
                 self.assertSetEqual(expected_replication_keys, actual_replication_keys)
@@ -101,9 +100,9 @@ class DiscoveryTest(ZuoraBaseTest):
 
                 # verify that if there is a replication key we are doing INCREMENTAL otherwise FULL
                 if actual_replication_keys:
-                    self.assertEqual(self.INCREMENTAL, actual_replication_method) # BUG_TDL-9711
+                    self.assertEqual(self.INCREMENTAL, actual_replication_method)
                 else:
-                    self.assertEqual(self.FULL_TABLE, actual_replication_method) # BUG_TDL-9711
+                    self.assertEqual(self.FULL_TABLE, actual_replication_method)
 
                 # verify that primary, replication and foreign keys
                 # are given the inclusion of automatic in annotated schema.
@@ -117,16 +116,14 @@ class DiscoveryTest(ZuoraBaseTest):
                 actual_automatic_fields = {item.get("breadcrumb", ["properties", None])[1]
                                            for item in metadata
                                            if item.get("metadata").get("inclusion") == "automatic"}
+
                 self.assertEqual(expected_automatic_fields,
                                  actual_automatic_fields,
-                                 msg="expected {} automatic fields but got {}".format(
-                                     expected_automatic_fields,
-                                     actual_automatic_fields))
+                                 msg="expected {} automatic fields but got {}".format(expected_automatic_fields,
+                                                                                      actual_automatic_fields))
 
-                self.assertTrue(
-                    all({(item.get("metadata").get("inclusion") == "available" or item.get("metadata").get("inclusion") == "unsupported")
-                            for item in metadata
-                            if item.get("breadcrumb", []) != []
-                            and item.get("breadcrumb", ["properties", None])[1]
-                            not in actual_automatic_fields}),
-                    msg="Not all non key properties are set to available in metadata")
+                self.assertTrue(all({(item.get("metadata").get("inclusion") == "available" \
+                                or item.get("metadata").get("inclusion") == "unsupported") for item in metadata
+                                if item.get("breadcrumb", []) != [] and item.get("breadcrumb", ["properties", None])[1]
+                                not in actual_automatic_fields}),
+                                msg="Not all non key properties are set to available in metadata")

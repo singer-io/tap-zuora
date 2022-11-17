@@ -121,7 +121,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
                         replication_key_value = record.get(replication_key)
                         self.assertLessEqual(replication_key_value,
                                             first_bookmark_value_utc,
-                                            msg="First sync bookmark was set incorrectly, a record with a greater replication-key value was synced.")
+                                            msg="A record with a greater replication-key value was synced in first sync.")
 
                     for record in second_sync_messages:
                         replication_key_value = record.get(replication_key)
@@ -132,7 +132,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
                         # Verify the second sync bookmark value is the max replication key value for a given stream
                         self.assertLessEqual(replication_key_value,
                                             second_bookmark_value_utc,
-                                            msg="Second sync bookmark was set incorrectly, a record with a greater replication-key value was synced.")
+                                            msg="A record with a greater replication-key value was synced in second sync.")
 
                     # Verify that you get less than or equal to data getting at 2nd time around
                     self.assertLessEqual(second_sync_count,
@@ -148,8 +148,9 @@ class ZuoraBookmarking(ZuoraBaseTest):
                     # Verify the number of records in the second sync is the same as the first
                     self.assertEqual(second_sync_count, first_sync_count)
                 else:
-                    raise NotImplementedError("INVALID EXPECTATIONS\t\tSTREAM: {} REPLICATION_METHOD: {}".format(stream,
-                                                                                                                expected_replication_method))
+                    raise NotImplementedError("INVALID EXPECTATIONS\t\tSTREAM: {} REPLICATION_METHOD: {}".\
+                        format(stream, expected_replication_method))
 
                 # Verify at least 1 record was replicated in the second sync
-                self.assertGreater(second_sync_count, 0, msg="We are not fully testing bookmarking for {}".format(stream)) 
+                self.assertGreater(second_sync_count, 0, 
+                                   msg="We are not fully testing bookmarking for {}".format(stream)) 

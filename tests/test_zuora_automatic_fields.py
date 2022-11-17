@@ -35,7 +35,8 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
         test_catalogs_automatic_fields = [catalog for catalog in found_catalogs
                                           if catalog.get('stream_name') in expected_streams]
 
-        self.perform_and_verify_table_and_field_selection(conn_id, test_catalogs_automatic_fields, select_all_fields=False,)
+        self.perform_and_verify_table_and_field_selection(conn_id, test_catalogs_automatic_fields,
+                                                          select_all_fields=False,)
 
         # Run initial sync
         synced_records = runner.get_records_from_target_output()
@@ -51,7 +52,8 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
                 # Collect actual values
                 data = synced_records.get(stream, {})
                 record_messages_keys = [set(row.get('data').keys()) for row in data.get('messages', {})]
-                primary_keys_list = [tuple(message.get('data', {}).get(expected_pk) for expected_pk in expected_primary_keys)
+                primary_keys_list = [tuple(message.get('data', {}).get(expected_pk) 
+                                    for expected_pk in expected_primary_keys)
                                     for message in data.get('messages', [])
                                     if message.get('action') == 'upsert']
                 unique_primary_keys_list = set(primary_keys_list)
@@ -62,5 +64,5 @@ class ZuoraAutomaticFields(ZuoraBaseTest):
 
                 #Verify that all replicated records have unique primary key values.
                 self.assertEqual(len(primary_keys_list),
-                                len(unique_primary_keys_list),
-                                msg="Replicated record does not have unique primary key values.")
+                                 len(unique_primary_keys_list),
+                                 msg="Replicated record does not have unique primary key values.")

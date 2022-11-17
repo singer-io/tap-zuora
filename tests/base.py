@@ -61,8 +61,7 @@ class ZuoraBaseTest(unittest.TestCase):
     def get_credentials(self):
         """Authentication information for the test account"""
         return {'username': os.getenv('TAP_ZUORA_USERNAME'),
-                'password': os.getenv('TAP_ZUORA_PASSWORD')
-        }
+                'password': os.getenv('TAP_ZUORA_PASSWORD')}
 
     def get_properties(self, original: bool = True):
         """Configuration of properties required for the tap."""
@@ -286,7 +285,7 @@ class ZuoraBaseTest(unittest.TestCase):
 
     def expected_primary_keys(self):
         """
-        return a dictionary with key of table name
+        Return a dictionary with key of table name
         and value as a set of primary key fields
         """
         return {table: properties.get(self.PRIMARY_KEYS, set())
@@ -295,7 +294,7 @@ class ZuoraBaseTest(unittest.TestCase):
 
     def expected_replication_keys(self):
         """
-        return a dictionary with key of table name
+        Return a dictionary with key of table name
         and value as a set of replication key fields
         """
         return {table: properties.get(self.REPLICATION_KEYS, set())
@@ -305,12 +304,11 @@ class ZuoraBaseTest(unittest.TestCase):
     def expected_automatic_fields(self):
         auto_fields = {}
         for k, v in self.expected_metadata().items():
-            auto_fields[k] = v.get(self.PRIMARY_KEYS, set()) | v.get(self.REPLICATION_KEYS, set()) #\
-                #| v.get(self.FOREIGN_KEYS, set())
+            auto_fields[k] = v.get(self.PRIMARY_KEYS, set()) | v.get(self.REPLICATION_KEYS, set())
         return auto_fields
 
     def expected_replication_method(self):
-        """return a dictionary with key of table name and value of replication method"""
+        """Return a dictionary with key of table name and value of replication method"""
         return {table: properties.get(self.REPLICATION_METHOD, None)
                 for table, properties
                 in self.expected_metadata().items()}
@@ -326,10 +324,10 @@ class ZuoraBaseTest(unittest.TestCase):
 
         Return the connection id and found catalogs from menagerie.
         """
-        # run in check mode
+        # Run in check mode
         check_job_name = runner.run_check_mode(self, conn_id)
 
-        # verify check exit codes
+        # Verify check exit codes
         exit_status = menagerie.get_exit_status(conn_id, check_job_name)
         menagerie.verify_check_exit_status(self, exit_status, check_job_name)
 
@@ -352,12 +350,11 @@ class ZuoraBaseTest(unittest.TestCase):
         menagerie.verify_sync_exit_status(self, exit_status, sync_job_name)
 
         # Verify actual rows were synced
-        sync_record_count = runner.examine_target_output_file(
-            self, conn_id, self.expected_streams(), self.expected_primary_keys())
-        self.assertGreater(
-            sum(sync_record_count.values()), 0,
-            msg="failed to replicate any data: {}".format(sync_record_count)
-        )
+        sync_record_count = runner.examine_target_output_file(self, conn_id, 
+                                                              self.expected_streams(), self.expected_primary_keys())
+        self.assertGreater(sum(sync_record_count.values()), 0,
+                           msg="failed to replicate any data: {}".format(sync_record_count))
+
         LOGGER.info("total replicated row count: %s", sum(sync_record_count.values()))
 
         return sync_record_count
@@ -375,9 +372,8 @@ class ZuoraBaseTest(unittest.TestCase):
         """
 
         # Select all available fields or select no fields from all testable streams
-        self.select_all_streams_and_fields(
-            conn_id=conn_id, catalogs=test_catalogs, select_all_fields=select_all_fields
-        )
+        self.select_all_streams_and_fields(conn_id=conn_id, catalogs=test_catalogs, 
+                                           select_all_fields=select_all_fields)
 
         catalogs = menagerie.get_catalogs(conn_id)
 
@@ -398,8 +394,7 @@ class ZuoraBaseTest(unittest.TestCase):
                 # Verify all fields within each selected stream are selected
                 for field, field_props in catalog_entry.get('annotated-schema').get('properties').items():
                     field_selected = field_props.get('selected')
-                    LOGGER.info("\tValidating selection on %s.%s: %s",
-                                cat['stream_name'], field, field_selected)
+                    LOGGER.info("\tValidating selection on %s.%s: %s", cat['stream_name'], field, field_selected)
                     self.assertTrue(field_selected, msg="Field not selected.")
             else:                
                 # Verify only automatic fields are selected
@@ -416,9 +411,9 @@ class ZuoraBaseTest(unittest.TestCase):
         selected_fields = set()
         for field in metadata:
             is_field_metadata = len(field['breadcrumb']) > 1
-            if field['metadata'].get('inclusion') is None and is_field_metadata:  # BUG_SRCE-4313 remove when addressed
-                LOGGER.info("Error %s has no inclusion key in metadata", field)  # BUG_SRCE-4313 remove when addressed
-                continue  # BUG_SRCE-4313 remove when addressed
+            if field['metadata'].get('inclusion') is None and is_field_metadata:
+                LOGGER.info("Error %s has no inclusion key in metadata", field)
+                continue
             inclusion_automatic_or_selected = (
                 field['metadata']['selected'] is True or \
                 field['metadata']['inclusion'] == 'automatic'
@@ -437,11 +432,10 @@ class ZuoraBaseTest(unittest.TestCase):
             non_selected_properties = []
             if not select_all_fields:
                 # get a list of all properties so that none are selected
-                non_selected_properties = schema.get('annotated-schema', {}).get(
-                    'properties', {}).keys()
+                non_selected_properties = schema.get('annotated-schema', {}).get('properties', {}).keys()
 
-            connections.select_catalog_and_fields_via_metadata(
-                conn_id, catalog, schema, [], non_selected_properties)
+            connections.select_catalog_and_fields_via_metadata(conn_id, catalog, 
+                                                               schema, [], non_selected_properties)
 
     def parse_date(self, date_value):
         """
@@ -502,10 +496,10 @@ class ZuoraBaseTest(unittest.TestCase):
             repl_key = list(self.expected_replication_keys()[stream])
             state = bookmark[repl_key[0]]
 
-            # convert state from string to datetime object
+            # Convert state from string to datetime object
             state_as_datetime = dateutil.parser.parse(state)
             calculated_state_as_datetime = state_as_datetime - timedelta(days=days, hours=hours, minutes=minutes)
-            # convert back to string and format
+            # Convert back to string and format
             calculated_state = datetime.strftime(calculated_state_as_datetime, "%Y-%m-%dT%H:%M:%S.000000Z")
             stream_to_calculated_state[stream] = calculated_state
             bookmark[repl_key[0]] = ""
@@ -513,41 +507,42 @@ class ZuoraBaseTest(unittest.TestCase):
       
         return stream_to_calculated_state["bookmarks"]
 
-    def get_mid_point_date(self, start_date, bookmark_date):
-        """
-        Function to find the middle date between two dates
-        """
-        date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
-        start_date_dt = datetime.strptime(start_date, self.START_DATE_FORMAT)
-        bookmark_date_dt = datetime.strptime(bookmark_date, self.BOOKMARK_COMPARISON_FORMAT)
-        mid_date_dt = start_date_dt.date() + (bookmark_date_dt-start_date_dt) / 2
-        # Convert datetime object to string format
-        mid_date = mid_date_dt.strftime(date_format)
-        return mid_date
-
     def is_incremental(self, stream):
         """Checking if the given stream is incremental or not"""
         return self.expected_metadata().get(stream).get(self.REPLICATION_METHOD) == self.INCREMENTAL
 
-    def create_interrupt_sync_state(self, state, interrupt_stream, pending_streams, start_date):
+    def create_interrupt_sync_state(self, state, interrupt_stream, pending_streams, sync_records):
         """
         This function will create a new interrupt sync bookmark state
         """
         expected_replication_keys = self.expected_replication_keys()
-        bookmark_state = state['bookmarks']
-        if self.is_incremental(interrupt_stream):
-            replication_key = next(iter(expected_replication_keys[interrupt_stream]))
-            bookmark_date = bookmark_state[interrupt_stream][replication_key]
-            updated_bookmark_date = self.get_mid_point_date(start_date, bookmark_date)
-            bookmark_state[interrupt_stream][replication_key] = updated_bookmark_date
-        state["current_stream"] = interrupt_stream
+        interrupted_sync_states = copy.deepcopy(state)
+        bookmark_state = interrupted_sync_states["bookmarks"]
+        # Set the interrupt stream as currently syncing
+        interrupted_sync_states["current_stream"] = interrupt_stream
 
         # For pending streams, update the bookmark_value to start-date 
-        for stream in iter(pending_streams):
+        for stream in pending_streams:
             # Only incremental streams should have the bookmark value
             if self.is_incremental(stream):
-                replication_key = next(iter(expected_replication_keys[stream]))
-                bookmark_state[stream][replication_key] = start_date
-            state["bookmarks"] = bookmark_state
-        
-        return state
+                bookmark_state.pop(stream, None)
+
+        if self.is_incremental(interrupt_stream):
+            replication_key = next(iter(expected_replication_keys[interrupt_stream]))
+
+        # Update state for chats stream and set the bookmark to a date earlier
+            interrupted_stream_bookmark = bookmark_state.get(interrupt_stream, {})
+            interrupted_stream_bookmark.pop("offset", None)
+            interrupted_stream_rec = []
+            for record in sync_records.get(interrupt_stream).get("messages"):
+                if record.get("action") == "upsert":
+                    rec = record.get("data")
+                    interrupted_stream_rec.append(rec)
+
+            # Set a deferred bookmark value for both the bookmarks of chat stream
+            rec_index = len(interrupted_stream_rec) // 2 if len(interrupted_stream_rec) > 1 else 0
+            interrupted_stream_bookmark[replication_key] = interrupted_stream_rec[rec_index][replication_key]
+
+            bookmark_state[interrupt_stream] = interrupted_stream_bookmark
+            interrupted_sync_states["bookmarks"] = bookmark_state
+        return interrupted_sync_states
