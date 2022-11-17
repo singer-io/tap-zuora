@@ -16,7 +16,7 @@ setup(
         "pendulum==1.2.0",
         "backoff==1.8.0",
     ],
-    extras_require={"dev": ["ipdb", "pylint==2.5.3"]},
+    extras_require={"dev": ["ipdb", "pylint"]},
     entry_points="""
           [console_scripts]
           tap-zuora=tap_zuora:main
