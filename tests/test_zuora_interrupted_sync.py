@@ -133,11 +133,8 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
 
                 first_bookmark_value = first_sync_bookmarks.get("bookmarks", {stream: None}).get(stream)
                 second_bookmark_value = second_sync_bookmarks.get("bookmarks", {stream: None}).get(stream)
-                LOGGER.info(
-                    "first_bookmark_value =%s \n second_bookmark_value =%s",
-                    first_bookmark_value,
-                    second_bookmark_value,
-                )
+                LOGGER.info("first_bookmark_value =%s ", first_bookmark_value)
+                LOGGER.info("second_bookmark_value =%s ", second_bookmark_value)
 
                 if expected_replication_method == self.INCREMENTAL:
                     if stream in completed_streams:

@@ -37,11 +37,10 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.run_test("AQUA")
 
     def run_test(self, api_type):
-        """• Verify no unexpected streams were replicated.
-
-        • Verify that more than just the automatic fields are replicated
-        for each stream. • verify all fields for each stream are
-        replicated
+        """
+        - Verify no unexpected streams were replicated.
+        - Verify that more than just the automatic fields are replicated for each stream.
+        - Verify all fields for each stream are replicated
         """
         self.zuora_api_type = api_type
 
@@ -85,7 +84,7 @@ class ZuoraAllFields(ZuoraBaseTest):
                 # Verify that more than just the automatic fields are replicated for each stream.
                 self.assertTrue(
                     expected_automatic_keys.issubset(expected_all_keys),
-                    msg=f'{expected_automatic_keys - expected_all_keys} is not in "expected_all_keys"',
+                    msg=f"{expected_automatic_keys - expected_all_keys} is not in 'expected_all_keys'",
                 )
 
                 messages = synced_records.get(stream)

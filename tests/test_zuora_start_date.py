@@ -22,11 +22,10 @@ class ZuoraStartDateTest(ZuoraBaseTest):
     def run_test(self, api_type):
         """Test that the start_date configuration is respected.
 
-        • verify that a sync with a later start date has at least one
-        record synced and less records than the 1st sync with a previous
-        start date • verify that each stream has less records than the
-        earlier start date sync • verify all data from later start data
-        has bookmark values >= start_date
+        - Verify that a sync with a later start date has at least one record synced
+            and less records than the 1st sync with a previous start date
+        - Verify that each stream has less records than the earlier start date sync
+        - Verify all data from later start data has bookmark values >= start_date
         """
         self.zuora_api_type = api_type
         self.start_date_1 = datetime.strftime(utils.now() - timedelta(days=8), "%Y-%m-%dT00:00:00Z")

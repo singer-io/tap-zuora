@@ -21,18 +21,19 @@ class DiscoveryTest(ZuoraBaseTest):
         """Verify that discover creates the appropriate catalog, schema,
         metadata, etc.
 
-        • Verify number of actual streams discovered match expected •
-        Verify the stream names discovered were what we expect • Verify
-        stream names follow naming convention   streams should only have
-        lowercase alphas and underscores • verify there is only 1 top
-        level breadcrumb • Verify primary key(s) match expectations. •
-        Verify replication key(s) match expectations. • verify that if
-        there is a replication key we are doing INCREMENTAL otherwise
-        FULL • verify the actual replication matches our expected
-        replication method • verify that primary, replication and
-        foreign keys   are given the inclusion of automatic (metadata
-        and annotated schema). • verify that all other fields have
-        inclusion of available (metadata and schema)
+        - Verify number of actual streams discovered match expected
+        - Verify the stream names discovered were what we expect
+        - Verify stream names follow naming convention   streams should only have
+            lowercase alphas and underscores
+        - Verify there is only 1 top level breadcrumb
+        - Verify primary key(s) match expectations.
+        - Verify replication key(s) match expectations.
+        - Verify that if there is a replication key we are doing INCREMENTAL otherwise FULL.
+        - Verify the actual replication matches our expected
+            replication method
+        - Verify that primary, replication and foreign keys are given the inclusion of automatic (metadata
+            and annotated schema)
+        - Verify that all other fields have inclusion of available (metadata and schema)
         """
         self.zuora_api_type = api_type
 
