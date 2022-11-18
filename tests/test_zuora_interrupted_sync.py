@@ -98,11 +98,8 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         second_sync_record_count = self.run_and_verify_sync(conn_id)
         second_sync_records = runner.get_records_from_target_output()
         second_sync_bookmarks = menagerie.get_state(conn_id)
-        LOGGER.info(
-            "second_sync_record_count = %s \n second_sync_bookmarks = %s",
-            second_sync_record_count,
-            second_sync_bookmarks,
-        )
+        LOGGER.info("second_sync_record_count = %s ", second_sync_record_count)
+        LOGGER.info("second_sync_bookmarks = %s", second_sync_bookmarks)
 
         # Run sync after interruption
         final_state = menagerie.get_state(conn_id)
