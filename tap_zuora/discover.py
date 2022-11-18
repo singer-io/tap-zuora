@@ -5,8 +5,8 @@ import singer
 from singer import metadata
 
 from tap_zuora import apis
-from tap_zuora.exceptions import ApiException
 from tap_zuora.client import Client
+from tap_zuora.exceptions import ApiException
 
 TYPE_MAP = {
     "picklist": "string",
@@ -72,9 +72,7 @@ LOGGER = singer.get_logger()
 def parse_field_element(field_element):
     name = field_element.find("name").text
     field_type = TYPE_MAP.get(field_element.find("type").text, None)
-    required = (
-        field_element.find("required").text.lower() == "true" or name in REQUIRED_KEYS
-    )
+    required = field_element.find("required").text.lower() == "true" or name in REQUIRED_KEYS
     contexts = [t.text for t in list(field_element.find("contexts"))]
     return {
         "name": name,
@@ -96,28 +94,20 @@ def get_field_dict(client: Client, stream_name: str) -> Dict:
 
         # Make the field unsupported if type is None
         if field_info["type"] is None:
-            LOGGER.info(
-                f"{stream_name}.{field_info['name']} has an unsupported data type"
-            )
+            LOGGER.info(f"{stream_name}.{field_info['name']} has an unsupported data type")
             supported = False
 
         # Skip the stream from discovery if the required field is not exportable
-        if (
-            "export" not in field_info["contexts"]
-            and field_info["name"] in REQUIRED_KEYS
-        ):
+        if "export" not in field_info["contexts"] and field_info["name"] in REQUIRED_KEYS:
             LOGGER.info(
-                f"Skipping stream {stream_name} since required field {field_info['name']}"
-                f" not available for export"
+                f"Skipping stream {stream_name} since required field {field_info['name']}" f" not available for export"
             )
             field_dict = {}
             break
 
         # Skip the non-required field if is not exportable
         if "export" not in field_info["contexts"]:
-            LOGGER.info(
-                f"{stream_name}.{field_info['name']} is not available for export"
-            )
+            LOGGER.info(f"{stream_name}.{field_info['name']} is not available for export")
             continue
 
         field_dict[field_info["name"]] = {
@@ -149,8 +139,8 @@ def discover_stream_names(client: Client):
 
 
 def is_unsupported_field(stream_name: str, field_name: str, is_rest: bool) -> bool:
-    """Checks whether a given field for a given stream is supported,
-    applicable only for REST api calls."""
+    """Checks whether a given field for a given stream is supported, applicable
+    only for REST api calls."""
     unsupported_fields = UNSUPPORTED_FIELDS_FOR_REST.get(stream_name, [])
     return bool(unsupported_fields and is_rest and field_name in unsupported_fields)
 
@@ -200,19 +190,11 @@ def discover_stream(client: Client, stream_name: str) -> Union[Dict, None]:
             field_properties["type"] = [field_properties["type"], "null"]
 
         if field_name in REQUIRED_KEYS:
-            mdata = metadata.write(
-                mdata, ("properties", field_name), "inclusion", "automatic"
-            )
-        elif props["supported"] and not is_unsupported_field(
-            stream_name, field_name, client.is_rest
-        ):
-            mdata = metadata.write(
-                mdata, ("properties", field_name), "inclusion", "available"
-            )
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "automatic")
+        elif props["supported"] and not is_unsupported_field(stream_name, field_name, client.is_rest):
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "available")
         else:
-            mdata = metadata.write(
-                mdata, ("properties", field_name), "inclusion", "unsupported"
-            )
+            mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "unsupported")
 
         properties[field_name] = field_properties
 
@@ -231,9 +213,7 @@ def discover_stream(client: Client, stream_name: str) -> Union[Dict, None]:
         return None
     elif status == "available_with_deleted":
         properties["Deleted"] = {"type": "boolean"}
-        mdata = metadata.write(
-            mdata, ("properties", "Deleted"), "inclusion", "available"
-        )
+        mdata = metadata.write(mdata, ("properties", "Deleted"), "inclusion", "available")
 
     return {
         "tap_stream_id": stream_name,
@@ -251,9 +231,7 @@ def discover_stream(client: Client, stream_name: str) -> Union[Dict, None]:
 
 
 def discover_streams(client: Client) -> List:
-    """
-    Performs discovery for each stream
-    """
+    """Performs discovery for each stream."""
     streams = []
     failed_stream_names = []
     for stream_name in discover_stream_names(client):

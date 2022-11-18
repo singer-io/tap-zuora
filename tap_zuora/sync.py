@@ -1,13 +1,14 @@
 import csv
 import io
 import time
-from typing import Dict, List, Union, Type
+from typing import Dict, List, Type, Union
+
 import pendulum
 import singer
 from singer import transform
-from tap_zuora.client import Client
 
 from tap_zuora import apis
+from tap_zuora.client import Client
 from tap_zuora.exceptions import ApiException, FileIdNotFoundException
 
 PARTNER_ID = "salesforce"
@@ -62,9 +63,7 @@ def sync_file_ids(
     file_ids: List, client: Client, state: Dict, stream: Dict, api, counter
 ):  # pylint: disable=too-many-branches
     if stream.get("replication_key"):
-        start_date = state["bookmarks"][stream["tap_stream_id"]][
-            stream["replication_key"]
-        ]
+        start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
     else:
         start_date = None
 
@@ -116,17 +115,11 @@ def sync_file_ids(
                     # There's a chance we get back a bad record here, and we don't want to null the bookmark
                     continue
 
-                singer.write_record(
-                    stream["tap_stream_id"], record, time_extracted=extraction_time
-                )
-                state["bookmarks"][stream["tap_stream_id"]][
-                    stream["replication_key"]
-                ] = bookmark
+                singer.write_record(stream["tap_stream_id"], record, time_extracted=extraction_time)
+                state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = bookmark
                 singer.write_state(state)
             else:
-                singer.write_record(
-                    stream["tap_stream_id"], record, time_extracted=extraction_time
-                )
+                singer.write_record(stream["tap_stream_id"], record, time_extracted=extraction_time)
 
             counter.increment()
 
@@ -146,15 +139,9 @@ def handle_aqua_timeout(ex: apis.ExportTimedOut, stream: Dict, state: Dict):
     if not stream.get("replication_key"):
         return
     LOGGER.info("Export timed out, reducing query window and writing state.")
-    window_bookmark = state["bookmarks"][stream["tap_stream_id"]].get(
-        "current_window_end"
-    )
-    previous_window_end = (
-        pendulum.parse(window_bookmark) if window_bookmark else pendulum.utcnow()
-    )
-    window_start = pendulum.parse(
-        state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
-    )
+    window_bookmark = state["bookmarks"][stream["tap_stream_id"]].get("current_window_end")
+    previous_window_end = pendulum.parse(window_bookmark) if window_bookmark else pendulum.utcnow()
+    window_start = pendulum.parse(state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]])
     if previous_window_end == window_start:
         raise apis.ExportFailed(
             f"Export too large for smallest possible query window. Cannot subdivide any further."
@@ -163,16 +150,14 @@ def handle_aqua_timeout(ex: apis.ExportTimedOut, stream: Dict, state: Dict):
 
     half_day_range = (previous_window_end - window_start) // 2
     current_window_end = previous_window_end - half_day_range
-    state["bookmarks"][stream["tap_stream_id"]][
-        "current_window_end"
-    ] = current_window_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+    state["bookmarks"][stream["tap_stream_id"]]["current_window_end"] = current_window_end.strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     singer.write_state(state)
 
 
 def sync_aqua_stream(client: Client, state: Dict, stream: Dict, counter):
-    """
-    Performs sync for AQUA mode
-    """
+    """Performs sync for AQUA mode."""
     try:
         file_ids = state["bookmarks"][stream["tap_stream_id"]].get("file_ids")
         if not file_ids:
@@ -181,13 +166,9 @@ def sync_aqua_stream(client: Client, state: Dict, stream: Dict, counter):
             state["bookmarks"][stream["tap_stream_id"]]["file_ids"] = file_ids
             singer.write_state(state)
 
-        if window_end := state["bookmarks"][stream["tap_stream_id"]].pop(
-            "current_window_end", None
-        ):
+        if window_end := state["bookmarks"][stream["tap_stream_id"]].pop("current_window_end", None):
             # Save the window_end as the latest bookmark in case the window was empty
-            state["bookmarks"][stream["tap_stream_id"]][
-                stream["replication_key"]
-            ] = window_end
+            state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = window_end
         return sync_file_ids(file_ids, client, state, stream, apis.Aqua, counter)
     except apis.ExportTimedOut as ex:
         handle_aqua_timeout(ex, stream, state)
@@ -218,7 +199,13 @@ def handle_rest_timeout(ex, stream: Dict, state: Dict, current_window: int, star
 
 
 def iterate_rest_query_window(
-    client: Client, state: Dict, stream: Dict, counter, start_pen, sync_started, window_length: int
+    client: Client,
+    state: Dict,
+    stream: Dict,
+    counter,
+    start_pen,
+    sync_started,
+    window_length: int,
 ):
     try:
         timed_out = False
@@ -236,9 +223,7 @@ def iterate_rest_query_window(
             start_pen = end_pen
             window_length = MAX_EXPORT_DAYS * 86400
             state["bookmarks"][stream["tap_stream_id"]].pop("window_length", None)
-            state["bookmarks"][stream["tap_stream_id"]][
-                stream["replication_key"]
-            ] = end_date
+            state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]] = end_date
             singer.write_state(state)
     except apis.ExportTimedOut as ex:
         window_length = handle_rest_timeout(ex, stream, state, window_length, start_pen)
@@ -246,9 +231,7 @@ def iterate_rest_query_window(
 
     if timed_out:
         LOGGER.info("Retrying timed out sync job...")
-        return iterate_rest_query_window(
-            client, state, stream, counter, start_pen, sync_started, window_length
-        )
+        return iterate_rest_query_window(client, state, stream, counter, start_pen, sync_started, window_length)
     return counter
 
 
@@ -257,14 +240,10 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
         counter = sync_file_ids(file_ids, client, state, stream, apis.Rest, counter)
 
     if stream.get("replication_key"):
-        bookmark_window_length = state["bookmarks"][stream["tap_stream_id"]].pop(
-            "window_length", None
-        )
+        bookmark_window_length = state["bookmarks"][stream["tap_stream_id"]].pop("window_length", None)
         window_length_in_seconds = bookmark_window_length or MAX_EXPORT_DAYS * 86400
         sync_started = pendulum.utcnow()
-        start_date = state["bookmarks"][stream["tap_stream_id"]][
-            stream["replication_key"]
-        ]
+        start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
         start_pen = pendulum.parse(start_date)
         counter = iterate_rest_query_window(
             client,
@@ -284,9 +263,7 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
 
 
 def sync_stream(client: Client, state: Dict, stream: Dict):
-    """
-    Starts the process for syncing the data for a given stream
-    """
+    """Starts the process for syncing the data for a given stream."""
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
         if client.is_rest:
             counter = sync_rest_stream(client, state, stream, counter)

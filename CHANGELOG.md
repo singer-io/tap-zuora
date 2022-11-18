@@ -2,9 +2,9 @@
 
 ## 1.3.4
   * Skip 'BillingPreviewRun' stream since 'Id' field is not available for export [#64](https://github.com/singer-io/tap-zuora/pull/64)
-  
+
 ## 1.3.3
-  * Increase artifical timeout to 12 hrs to accomodate larger AQuA full table requests. [#62](https://github.com/singer-io/tap-zuora/pull/62)
+  * Increase artificial timeout to 12 hrs to accommodate larger AQuA full table requests. [#62](https://github.com/singer-io/tap-zuora/pull/62)
 
 ## 1.3.2
   * Catch ApiExceptions for unavailable streams. [#60](https://github.com/singer-io/tap-zuora/pull/60)
@@ -129,7 +129,7 @@
   * Fixes a bug with AQuA queries being created incorrectly when deleted objects are desired [#7](https://github.com/singer-io/tap-zuora/pull/7)
 
 ## 0.1.1
-  * Fixes a bug with accesing partner_id as the Client is being created [#4](https://github.com/singer-io/tap-zuora/pull/4)
+  * Fixes a bug with accessing partner_id as the Client is being created [#4](https://github.com/singer-io/tap-zuora/pull/4)
   * Output the Zuora query to the log for visibility [#5](https://github.com/singer-io/tap-zuora/pull/5)
   * Adds Singer metadata to the Deleted field added for Zuora objects that support it [#6](https://github.com/singer-io/tap-zuora/pull/6)
 

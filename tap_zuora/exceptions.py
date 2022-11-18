@@ -15,12 +15,8 @@ class RetryableException(ApiException):
 
 
 class BadCredentialsException(Exception):
-    """
-    Exception for BadCredentials
-    """
+    """Exception for BadCredentials."""
 
 
 class FileIdNotFoundException(Exception):
-    """
-     Handler for file id not found exception
-    """
+    """Handler for file id not found exception."""
