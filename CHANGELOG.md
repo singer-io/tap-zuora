@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0
+  * Code Refactoring [#68](https://github.com/singer-io/tap-zuora/pull/68)
+    - Makes a non-exportable field as unsupported in catalog file during discovery phase
+    - Updates the `DELETE_NOT_SUPPORTED` streams for AQuA Api calls
+    - Handles non-200 and non-retryable exceptions
+    - Replaces `get_children` XML function with list iterator to make the tap compatible with python v3.9.6
+  * Adds missing integration tests [#67](https://github.com/singer-io/tap-zuora/pull/67)
+
 ## 1.3.4
   * Skip 'BillingPreviewRun' stream since 'Id' field is not available for export [#64](https://github.com/singer-io/tap-zuora/pull/64)
 
