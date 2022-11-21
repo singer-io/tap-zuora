@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1
+  * Skip saving schema for non-discoverable streams since replication key field is not available for export [#72](https://github.com/singer-io/tap-zuora/pull/72)
+
 ## 1.4.0
   * Code Refactoring [#68](https://github.com/singer-io/tap-zuora/pull/68)
     - Makes a non-exportable field as unsupported in catalog file during discovery phase
