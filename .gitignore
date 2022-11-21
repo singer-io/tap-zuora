@@ -98,3 +98,6 @@ config.json
 .autoenv.zsh
 
 todo.org
+config.json
+state.json
+catalog.json
