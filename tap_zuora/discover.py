@@ -103,7 +103,7 @@ def get_field_dict(client: Client, stream_name: str) -> Dict:
                 f"Skipping stream {stream_name} since required field {field_info['name']}" f" not available for export"
             )
             field_dict = {}
-            break
+            return field_dict
 
         # Skip the non-required field if is not exportable
         if "export" not in field_info["contexts"]:
