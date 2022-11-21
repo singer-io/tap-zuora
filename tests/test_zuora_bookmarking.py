@@ -35,7 +35,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Select only the expected streams tables
-        expected_streams = {"PaymentMethodTransactionLog", "Export"}
+        expected_streams = {"Export"}
         expected_replication_keys = self.expected_replication_keys()
         expected_replication_methods = self.expected_replication_method()
 
