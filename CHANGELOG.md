@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.2
+  * Don't add related_object to field_dict if unqueryable [#73](https://github.com/singer-io/tap-zuora/pull/73)
+
 ## 1.4.1
   * Skip saving schema for non-discoverable streams since replication key field is not available for export [#72](https://github.com/singer-io/tap-zuora/pull/72)
 
