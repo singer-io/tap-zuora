@@ -64,6 +64,10 @@ UNSUPPORTED_FIELDS_FOR_REST = {
     "Usage": ["ImportId"],
 }
 
+UNSUPPORTED_RELATED_OBJECTS = {
+    "SubscriptionStatusHistory",
+    }
+
 REQUIRED_KEYS = ["Id"] + REPLICATION_KEYS
 
 LOGGER = singer.get_logger()
@@ -117,7 +121,14 @@ def get_field_dict(client: Client, stream_name: str) -> Dict:
         }
 
     for related_object in list(etree.find("related-objects")):
-        related_object_name = related_object.find("name").text + ".Id"
+        related_object_name = related_object.find("name").text
+
+        if related_object_name in UNSUPPORTED_RELATED_OBJECTS:
+            LOGGER.info(f"{related_object_name} cannot be queried with {stream_name}")
+            continue
+
+        related_object_name = related_object_name + ".Id"
+
         field_dict[related_object_name] = {
             "type": "string",
             "required": False,
