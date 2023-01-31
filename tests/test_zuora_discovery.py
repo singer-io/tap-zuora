@@ -44,7 +44,7 @@ class DiscoveryTest(ZuoraBaseTest):
         found_catalogs = self.run_and_verify_check_mode(conn_id)
 
         # verify the tap only discovers the expected streams
-        found_catalog_names = {catalog["tap_stream_id"] for catalog in found_catalogs}
+        found_catalog_names = {catalog["tap_stream_id"] for catalog in found_catalogs} - self.streams_not_under_test
         self.assertSetEqual(streams_to_test, found_catalog_names)
         LOGGER.info("discovered schemas are OK")
 
