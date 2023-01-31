@@ -53,6 +53,13 @@ class ZuoraBaseTest(unittest.TestCase):
         "JournalEntryDetailInvoiceItemAdjustment",
     }
 
+    #BUG: https://jira.talendforge.org/browse/TDL-21812
+    streams_not_under_test = {
+        "JournalEntryDetailRealizedFxGainLoss",
+        "JournalEntryDetailUnrealizedFxGainLoss",
+        "SubscriptionStatusHistory",
+    }
+
     def name(self):
         return "tap_tester_zuora"
 
