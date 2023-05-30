@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.3
+  * Dependabot update [#75](https://github.com/singer-io/tap-zuora/pull/75)
+
 ## 1.4.2
   * Don't add related_object to field_dict if unqueryable [#73](https://github.com/singer-io/tap-zuora/pull/73)
 
