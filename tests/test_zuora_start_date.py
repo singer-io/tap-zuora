@@ -49,7 +49,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         test_catalogs_1_all_fields = [
             catalog for catalog in found_catalogs_1 if catalog.get("tap_stream_id") in expected_streams
         ]
-        self.perform_and_verify_table_and_field_selection(conn_id_1, test_catalogs_1_all_fields, select_all_fields=True)
+        self.perform_and_verify_table_and_field_selection(conn_id_1, test_catalogs_1_all_fields, select_all_fields=False)
 
         # Run initial sync
         record_count_by_stream_1 = self.run_and_verify_sync(conn_id_1)
@@ -77,7 +77,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         test_catalogs_2_all_fields = [
             catalog for catalog in found_catalogs_2 if catalog.get("tap_stream_id") in expected_streams
         ]
-        self.perform_and_verify_table_and_field_selection(conn_id_2, test_catalogs_2_all_fields, select_all_fields=True)
+        self.perform_and_verify_table_and_field_selection(conn_id_2, test_catalogs_2_all_fields, select_all_fields=False)
 
         # Run sync
         record_count_by_stream_2 = self.run_and_verify_sync(conn_id_2)

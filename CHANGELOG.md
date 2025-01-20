@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.3
+  * Bump requests version to 2.32.3 [#77](https://github.com/singer-io/tap-zuora/pull/77)
+
 ## 1.4.2
   * Don't add related_object to field_dict if unqueryable [#73](https://github.com/singer-io/tap-zuora/pull/73)
 
