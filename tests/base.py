@@ -8,7 +8,10 @@ import pytz
 import singer
 from singer import utils
 from tap_tester import connections, menagerie, runner
+from tap_tester.jira_client import JiraClient as jira_client
+from tap_tester.jira_client import CONFIGURATION_ENVIRONMENT as jira_config
 
+JIRA_CLIENT = jira_client({ **jira_config })
 LOGGER = singer.get_logger()
 
 
