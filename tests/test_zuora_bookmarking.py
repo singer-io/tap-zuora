@@ -46,6 +46,7 @@ class ZuoraBookmarking(ZuoraBaseTest):
 
         catalog_entries = [catalog for catalog in found_catalogs if catalog["tap_stream_id"] in expected_streams]
 
+        # Disable all_fields selection as some fields are missing in the object
         self.perform_and_verify_table_and_field_selection(conn_id, catalog_entries, select_all_fields=False)
 
         # Run a first sync job using orchestrator

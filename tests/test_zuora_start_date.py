@@ -49,6 +49,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         test_catalogs_1_all_fields = [
             catalog for catalog in found_catalogs_1 if catalog.get("tap_stream_id") in expected_streams
         ]
+        # Disable all_fields selection as some fields are missing in the object
         self.perform_and_verify_table_and_field_selection(conn_id_1, test_catalogs_1_all_fields, select_all_fields=False)
 
         # Run initial sync
@@ -77,6 +78,7 @@ class ZuoraStartDateTest(ZuoraBaseTest):
         test_catalogs_2_all_fields = [
             catalog for catalog in found_catalogs_2 if catalog.get("tap_stream_id") in expected_streams
         ]
+        # Disable all_fields selection as some fields are missing in the object
         self.perform_and_verify_table_and_field_selection(conn_id_2, test_catalogs_2_all_fields, select_all_fields=False)
 
         # Run sync
