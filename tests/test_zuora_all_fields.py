@@ -45,7 +45,6 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        # Fail the test when the JIRA card is done to allow RefundTransactionLog stream to check the assertion
         expected_streams = {"Account"}  
         self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'), 
                     'done',  
