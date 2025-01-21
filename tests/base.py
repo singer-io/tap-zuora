@@ -8,7 +8,10 @@ import pytz
 import singer
 from singer import utils
 from tap_tester import connections, menagerie, runner
+from tap_tester.jira_client import JiraClient as jira_client
+from tap_tester.jira_client import CONFIGURATION_ENVIRONMENT as jira_config
 
+JIRA_CLIENT = jira_client({ **jira_config })
 LOGGER = singer.get_logger()
 
 
@@ -51,6 +54,7 @@ class ZuoraBaseTest(unittest.TestCase):
         "JournalEntryDetailTaxationItem",
         "JournalEntryDetailDebitTaxationItem",
         "JournalEntryDetailInvoiceItemAdjustment",
+        "RevenueRecognitionEventsTransaction"
     }
 
     #BUG: https://jira.talendforge.org/browse/TDL-21812
@@ -136,8 +140,6 @@ class ZuoraBaseTest(unittest.TestCase):
             "Amendment": incremental_updated_date,
             "BillingRun": incremental_updated_date,
             "BookingTransaction": incremental_updated_date,
-            "ChargeMetrics": incremental_updated_date,
-            "ChargeMetricsRun": incremental_updated_date,
             "CommunicationProfile": incremental_updated_date,
             "Contact": incremental_updated_date,
             "ContactSnapshot": incremental_updated_date,
@@ -219,6 +221,13 @@ class ZuoraBaseTest(unittest.TestCase):
             "EmailHistory": default_full,
             "Fulfillment": incremental_updated_date,
             "FulfillmentItem": incremental_updated_date,
+            "PaymentMethodToken": incremental_updated_date,
+            "DeliveryAdjustment": incremental_updated_date,
+            "SubscriptionChargeDeliverySchedule": incremental_updated_date,
+            "PaymentMethodPriority": incremental_updated_date,
+            "GatewayProfileData": incremental_updated_date,
+            "BillingPreviewRunResult": incremental_updated_date,
+            "RevenueRecognitionEventsTransaction": incremental_updated_date
         }
 
     def rest_only_streams(self):
@@ -232,8 +241,6 @@ class ZuoraBaseTest(unittest.TestCase):
             "Amendment",
             "BillingRun",
             "BookingTransaction",
-            "ChargeMetrics",
-            "ChargeMetricsRun",
             "CommunicationProfile",
             "Contact",
             "ContactSnapshot",
@@ -295,6 +302,8 @@ class ZuoraBaseTest(unittest.TestCase):
             "EmailHistory",
             "Fulfillment",
             "FulfillmentItem",
+            "BillingPreviewRunResult",
+            "RevenueRecognitionEventsTransaction",
         }
 
     def expected_streams(self):

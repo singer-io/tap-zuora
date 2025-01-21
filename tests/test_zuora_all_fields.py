@@ -1,4 +1,4 @@
-from base import ZuoraBaseTest
+from base import ZuoraBaseTest, JIRA_CLIENT
 from tap_tester import connections, menagerie, runner
 
 # These are the streams which don't support Deleted field coming in the catalog
@@ -45,7 +45,10 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {"RefundTransactionLog", "Account"}
+        expected_streams = {"Account"}  
+        self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'), 
+                    'done',  
+                    msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')  
 
         expected_automatic_fields = self.expected_automatic_fields()
         conn_id = connections.ensure_connection(self, original_properties=False)
