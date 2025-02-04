@@ -170,8 +170,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
         # 502(Bad Gateway), 503(service unavailable), 504(Gateway Timeout)
         if resp.status_code in [500, 502, 503, 504]:
             raise RetryableException(resp)
-        if resp.status_code == 400 and is_invalid_value_response(resp):
-            raise InvalidValueException(resp)
         self.check_for_error(resp, url_check)
         return resp
 
