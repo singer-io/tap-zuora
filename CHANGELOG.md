@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.4
+  * Remove fields from REST that the API reports as not found [#78](https://github.com/singer-io/tap-zuora/pull/78)
+
 ## 1.4.3
   * Fix Dependabot issue [#77](https://github.com/singer-io/tap-zuora/pull/77)
 
