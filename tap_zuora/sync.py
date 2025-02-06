@@ -6,10 +6,11 @@ from typing import Dict, List, Type, Union
 import pendulum
 import singer
 from singer import transform
+from requests.exceptions import HTTPError
 
 from tap_zuora import apis
 from tap_zuora.client import Client
-from tap_zuora.exceptions import ApiException, FileIdNotFoundException
+from tap_zuora.exceptions import ApiException, FileIdNotFoundException, InvalidValueException
 
 PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
@@ -245,15 +246,18 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
         sync_started = pendulum.utcnow()
         start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
         start_pen = pendulum.parse(start_date)
-        counter = iterate_rest_query_window(
-            client,
-            state,
-            stream,
-            counter,
-            start_pen,
-            sync_started,
-            window_length_in_seconds,
-        )
+        try:
+            counter = iterate_rest_query_window(
+                client,
+                state,
+                stream,
+                counter,
+                start_pen,
+                sync_started,
+                window_length_in_seconds,
+            )
+        except HTTPError as ex:
+            raise InvalidValueException(ex.response, stream_name=stream["tap_stream_id"]) from ex
     else:
         job_id = apis.Rest.create_job(client, stream)
         file_ids = poll_job_until_done(job_id, client, apis.Rest)

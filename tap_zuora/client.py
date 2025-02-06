@@ -10,6 +10,7 @@ from tap_zuora.exceptions import (
     BadCredentialsException,
     RateLimitException,
     RetryableException,
+    InvalidValueException,
 )
 from tap_zuora.utils import make_aqua_payload
 
@@ -34,6 +35,16 @@ LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
 
+def is_invalid_value_response(resp):
+    "Check for known structure of invalid value 400 response."
+    try:
+        errors = resp.json()['Errors']
+        for e in errors:
+            if e['Code'] == "INVALID_VALUE":
+                return True
+    except:
+        pass
+    return False
 
 class Client:  # pylint: disable=too-many-instance-attributes
     def __init__(
