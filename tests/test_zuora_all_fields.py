@@ -45,10 +45,10 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {"Account"}
-        # self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'),
-        #             'done',
-        #             msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')
+        expected_streams = {"Account"}  
+        self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'), 
+                    'done',  
+                    msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')  
 
         expected_automatic_fields = self.expected_automatic_fields()
         conn_id = connections.ensure_connection(self, original_properties=False)
