@@ -45,10 +45,10 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {"Account"}  
-        self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'), 
-                    'done',  
-                    msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')  
+        expected_streams = {"Account"}
+        self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'),
+                    'done',
+                    msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')
 
         expected_automatic_fields = self.expected_automatic_fields()
         conn_id = connections.ensure_connection(self, original_properties=False)
@@ -69,7 +69,7 @@ class ZuoraAllFields(ZuoraBaseTest):
             stream_id, stream_name = catalog["stream_id"], catalog["stream_name"]
             catalog_entry = menagerie.get_annotated_schema(conn_id, stream_id)
             fields_from_field_level_md = [
-                md_entry["breadcrumb"][1] for md_entry in catalog_entry["metadata"] if md_entry["breadcrumb"] != [] and md_entry['inclusion'] != 'unsupported'
+                md_entry["breadcrumb"][1] for md_entry in catalog_entry["metadata"] if md_entry["breadcrumb"] != [] and md_entry['metadata']['inclusion'] != 'unsupported'
             ]
             stream_to_all_catalog_fields[stream_name] = set(fields_from_field_level_md)
 
