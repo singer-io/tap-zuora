@@ -69,7 +69,7 @@ class ZuoraAllFields(ZuoraBaseTest):
             stream_id, stream_name = catalog["stream_id"], catalog["stream_name"]
             catalog_entry = menagerie.get_annotated_schema(conn_id, stream_id)
             fields_from_field_level_md = [
-                md_entry["breadcrumb"][1] for md_entry in catalog_entry["metadata"] if md_entry["breadcrumb"] != []
+                md_entry["breadcrumb"][1] for md_entry in catalog_entry["metadata"] if md_entry["breadcrumb"] != [] and md_entry['inclusion'] != 'unsupported'
             ]
             stream_to_all_catalog_fields[stream_name] = set(fields_from_field_level_md)
 
