@@ -82,16 +82,17 @@ def is_invalid_value_response(resp):
 class Client:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
-        config: dict,
+        username: str,
+        password: str,
+        auth_type: str,
         partner_id: str,
         sandbox: bool = False,
         european: bool = False,
         is_rest: bool = False,
     ):
-        self.username = config.get("username")
-        self.password = config.get("password")
-        self.client_id = config.get("client_id")
-        self.client_secret = config.get("client_secret")
+        self.username = username
+        self.password = password
+        self.auth_type = auth_type
         self.sandbox = sandbox
         self.european = european
         self.partner_id = partner_id
@@ -100,8 +101,8 @@ class Client:  # pylint: disable=too-many-instance-attributes
 
         self.access_token = (
             None
-            if self.username and self.password
-            else get_access_token(self.client_id, self.client_secret, URLS[(self.sandbox, self.european)])
+            if self.auth_type == "Basic"
+            else get_access_token(self.username, self.password, URLS[(self.sandbox, self.european)])
         )
         self.base_url = self.get_url()
 
@@ -115,7 +116,9 @@ class Client:  # pylint: disable=too-many-instance-attributes
         partner_id = config.get("partner_id", None)
         is_rest = config.get("api_type") == "REST"
         return Client(
-            config,
+            config["username"],
+            config["password"],
+            config.get("auth_type", "Basic"),
             partner_id,
             sandbox,
             european,

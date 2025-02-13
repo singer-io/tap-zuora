@@ -11,6 +11,8 @@ from tap_zuora.sync import sync_stream
 
 REQUIRED_CONFIG_KEYS = [
     "start_date",
+    "username",
+    "password",
     "api_type"
 ]
 
