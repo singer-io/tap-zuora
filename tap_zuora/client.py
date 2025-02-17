@@ -45,10 +45,7 @@ def get_access_token(client_id: str, client_secret: str, base_urls: list) -> str
         str: access token
     """
 
-    LOGGER.info("Username and password not provided. Getting access token using client ID and client secret")
-
-    if not client_id and not client_secret:
-        raise BadCredentialsException("Client ID and Client Secret are required to get access token")
+    LOGGER.info("Client_id and Client_secret provided. Getting access token.")
                
     for base_url in base_urls:
         url = f"{base_url}oauth/token"
@@ -142,7 +139,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
                 query = f"select * from {stream_name} limit 1"
                 post_url = f"{url_prefix}v1/batch-query/"
                 payload = make_aqua_payload("discover", query, self.partner_id)
-                resp = self._retryable_request("POST", post_url, headers=self.aqua_headers, url_check=True, json=payload)
+                resp = self._retryable_request("POST", post_url, url_check=True, headers=self.aqua_headers, json=payload)
                 if resp.status_code == 200:
                     resp_json = resp.json()
                     if "errorCode" in resp_json:
@@ -172,7 +169,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         )
 
     @property
-    def aqua_headers(self) -> Tuple:
+    def aqua_headers(self) -> Dict:
         if self.access_token:
             return {
                 "Authorization": f"Bearer {self.access_token}"
