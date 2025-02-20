@@ -98,8 +98,10 @@ class Client:  # pylint: disable=too-many-instance-attributes
 
         if self.auth_type == "Basic":
             self.access_token = None
-        else:
+        elif self.auth_type == "OAuth":
             self.access_token = get_access_token(self.username, self.password, URLS[(self.sandbox, self.european)])
+        else:
+            raise BadCredentialsException("auth_type must be set to 'Basic' or 'OAuth'")
         self.base_url = self.get_url()
 
         adapter = requests.adapters.HTTPAdapter(max_retries=5)  # Try again in the case the TCP socket closes
@@ -113,7 +115,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         is_rest = config.get("api_type") == "REST"
         auth_type = config.get("auth_type", "Basic")
         if auth_type not in ["Basic", "OAuth"]:
-            raise BadCredentialsException("auth_type must not be set to an empty string or None")
+            raise BadCredentialsException("auth_type must be set to 'Basic' or 'OAuth'")
 
         return Client(
             config["username"],

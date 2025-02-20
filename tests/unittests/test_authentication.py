@@ -94,7 +94,7 @@ class TestDiffAuthTypeValues(unittest.TestCase):
         }
         with self.assertRaises(BadCredentialsException) as e:
             client = Client.from_config(config)
-            self.assertEqual(str(e), "auth_type must not be set to an empty string or None")
+            self.assertEqual(str(e), "auth_type must be set to 'Basic' or 'OAuth'")
 
     def test_existing_connection_with_auth_type_empty_string(self):
         """
@@ -107,7 +107,7 @@ class TestDiffAuthTypeValues(unittest.TestCase):
         }
         with self.assertRaises(BadCredentialsException) as e:
             client = Client.from_config(config)
-            self.assertEqual(str(e), "auth_type must not be set to an empty string or None")
+            self.assertEqual(str(e), "auth_type must be set to 'Basic' or 'OAuth'")
 
     @patch("tap_zuora.client.get_access_token")
     @patch("tap_zuora.client.Client.get_url")
