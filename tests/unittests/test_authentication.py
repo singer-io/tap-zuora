@@ -111,7 +111,7 @@ class TestDiffAuthTypeValues(unittest.TestCase):
 
     @patch("tap_zuora.client.get_access_token")
     @patch("tap_zuora.client.Client.get_url")
-    def test_existing_connection_with_auth_type_basi(self, mock_get_url, mock_get_access_token):
+    def test_existing_connection_with_auth_type_basic(self, mock_get_url, mock_get_access_token):
         """
         Test to ensure that an auth_type is set to Basic when auth_type is set to Basic in the config
         """

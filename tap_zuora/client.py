@@ -112,7 +112,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         partner_id = config.get("partner_id", None)
         is_rest = config.get("api_type") == "REST"
         auth_type = config.get("auth_type", "Basic")
-        if auth_type in ["", None]:
+        if auth_type not in ["Basic", "OAuth"]:
             raise BadCredentialsException("auth_type must not be set to an empty string or None")
 
         return Client(
