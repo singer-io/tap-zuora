@@ -35,6 +35,36 @@ LATEST_WSDL_VERSION = "91.0"
 
 LOGGER = singer.get_logger()
 
+def get_access_token(client_id: str, client_secret: str, base_urls: list) -> str:
+    """
+    Get the access token from Zuora
+    Args:
+        username (str): Zuora username
+        password (str): Zuora password
+    Returns:
+        str: access token
+    """
+
+    LOGGER.info("Client_id and Client_secret provided. Getting access token.")
+               
+    for base_url in base_urls:
+        url = f"{base_url}oauth/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials"
+        }
+        try:
+            resp = requests.post(url, headers=headers, data=data)
+            resp.raise_for_status()
+            return resp.json()["access_token"]
+        except requests.exceptions.RequestException as e:
+            LOGGER.error(f"Error getting access token: {e}")
+            continue
+
+    raise BadCredentialsException("Could not get access token due to invalid credentials")
+
 def is_invalid_value_response(resp):
     "Check for known structure of invalid value 400 response."
     try:
@@ -51,6 +81,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         self,
         username: str,
         password: str,
+        auth_type: str,
         partner_id: str,
         sandbox: bool = False,
         european: bool = False,
@@ -58,12 +89,19 @@ class Client:  # pylint: disable=too-many-instance-attributes
     ):
         self.username = username
         self.password = password
+        self.auth_type = auth_type
         self.sandbox = sandbox
         self.european = european
         self.partner_id = partner_id
         self.is_rest = is_rest
         self._session = requests.Session()
 
+        if self.auth_type == "BASIC":
+            self.access_token = None
+        elif self.auth_type == "OAUTH":
+            self.access_token = get_access_token(self.username, self.password, URLS[(self.sandbox, self.european)])
+        else:
+            raise BadCredentialsException("auth_type must be set to 'BASIC' or 'OAUTH'")
         self.base_url = self.get_url()
 
         adapter = requests.adapters.HTTPAdapter(max_retries=5)  # Try again in the case the TCP socket closes
@@ -75,9 +113,14 @@ class Client:  # pylint: disable=too-many-instance-attributes
         european = config.get("european", False) == "true"
         partner_id = config.get("partner_id", None)
         is_rest = config.get("api_type") == "REST"
+        auth_type = config.get("auth_type", "BASIC")
+        if auth_type not in ["BASIC", "OAUTH"]:
+            raise BadCredentialsException("auth_type must be set to 'BASIC' or 'OAUTH'")
+
         return Client(
             config["username"],
             config["password"],
+            auth_type,
             partner_id,
             sandbox,
             european,
@@ -101,7 +144,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
                 query = f"select * from {stream_name} limit 1"
                 post_url = f"{url_prefix}v1/batch-query/"
                 payload = make_aqua_payload("discover", query, self.partner_id)
-                resp = self._retryable_request("POST", post_url, url_check=True, auth=self.aqua_auth, json=payload)
+                resp = self._retryable_request("POST", post_url, url_check=True, headers=self.aqua_headers, json=payload)
                 if resp.status_code == 200:
                     resp_json = resp.json()
                     if "errorCode" in resp_json:
@@ -117,7 +160,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
 
                     delete_id = resp_json["id"]
                     delete_url = f"{url_prefix}v1/batch-query/jobs/{delete_id}"
-                    self._retryable_request("DELETE", delete_url, auth=self.aqua_auth)
+                    self._retryable_request("DELETE", delete_url, headers=self.aqua_headers)
             if resp.status_code == 401:
                 continue
             else:
@@ -131,18 +174,33 @@ class Client:  # pylint: disable=too-many-instance-attributes
         )
 
     @property
-    def aqua_auth(self) -> Tuple:
-        return self.username, self.password
+    def aqua_headers(self) -> Dict:
+        if self.access_token:
+            return {
+                "Authorization": f"Bearer {self.access_token}"
+            }
+        else:
+            return {
+                "apiAccessKeyId": self.username,
+                "apiSecretAccessKey": self.password
+            }
 
     @property
     def rest_headers(self) -> Dict:
         """Returns headers for HTTP request."""
-        return {
-            "apiAccessKeyId": self.username,
-            "apiSecretAccessKey": self.password,
-            "X-Zuora-WSDL-Version": LATEST_WSDL_VERSION,
-            "Content-Type": "application/json",
-        }
+        if self.access_token:
+            return {
+                "Authorization": f"Bearer {self.access_token}",
+                "X-Zuora-WSDL-Version": LATEST_WSDL_VERSION,
+                "Content-Type": "application/json",
+            }
+        else:
+            return {
+                "apiAccessKeyId": self.username,
+                "apiSecretAccessKey": self.password,
+                "X-Zuora-WSDL-Version": LATEST_WSDL_VERSION,
+                "Content-Type": "application/json",
+            }
 
     # NB> Backoff as recommended by Zuora here:
     # https://community.zuora.com/t5/Release-Notifications/Upcoming-Change-for-AQuA-and-Data-Source-Export-January-2021/ba-p/35024
@@ -204,7 +262,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
     def aqua_request(self, method: str, path: str, **kwargs) -> requests.Response:
         with metrics.http_request_timer(path):
             url = self.base_url + path
-            return self._request(method, url, auth=self.aqua_auth, **kwargs)
+            return self._request(method, url, headers=self.aqua_headers, **kwargs)
 
     def rest_request(self, method: str, path: str, **kwargs) -> requests.Response:
         with metrics.http_request_timer(path):
