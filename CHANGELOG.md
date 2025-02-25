@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.4
+## 1.5.0
   * Add oauth option for authorization [#79](https://github.com/singer-io/tap-zuora/pull/79)
 
 ## 1.4.4
