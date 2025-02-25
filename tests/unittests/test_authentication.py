@@ -73,14 +73,14 @@ class TestDiffAuthTypeValues(unittest.TestCase):
     @patch("tap_zuora.client.Client.get_url")
     def test_existing_connection_without_auth_type(self, mock_get_url, mock_get_access_token):
         """
-        Test to ensure that an auth_type is set to Basic when auth_type is not provided
+        Test to ensure that an auth_type is set to BASIC when auth_type is not provided
         """
         config = {
             "username": "test_user",
             "password": "test_pass",
         }
         client = Client.from_config(config)
-        self.assertEqual(client.auth_type, "Basic")
+        self.assertEqual(client.auth_type, "BASIC")
         self.assertEqual(client.access_token, None)
 
     def test_existing_connection_with_auth_type_None(self):
@@ -94,7 +94,7 @@ class TestDiffAuthTypeValues(unittest.TestCase):
         }
         with self.assertRaises(BadCredentialsException) as e:
             client = Client.from_config(config)
-            self.assertEqual(str(e), "auth_type must be set to 'Basic' or 'OAuth'")
+            self.assertEqual(str(e), "auth_type must be set to 'BASIC' or 'OAUTH'")
 
     def test_existing_connection_with_auth_type_empty_string(self):
         """
@@ -107,34 +107,34 @@ class TestDiffAuthTypeValues(unittest.TestCase):
         }
         with self.assertRaises(BadCredentialsException) as e:
             client = Client.from_config(config)
-            self.assertEqual(str(e), "auth_type must be set to 'Basic' or 'OAuth'")
+            self.assertEqual(str(e), "auth_type must be set to 'BASIC' or 'OAUTH'")
 
     @patch("tap_zuora.client.get_access_token")
     @patch("tap_zuora.client.Client.get_url")
     def test_existing_connection_with_auth_type_basic(self, mock_get_url, mock_get_access_token):
         """
-        Test to ensure that an auth_type is set to Basic when auth_type is set to Basic in the config
+        Test to ensure that an auth_type is set to BASIC when auth_type is set to BASIC in the config
         """
         config = {
             "username": "test_user",
             "password": "test_pass",
-            "auth_type": "Basic",
+            "auth_type": "BASIC",
         }
         client = Client.from_config(config)
-        self.assertEqual(client.auth_type, "Basic")
+        self.assertEqual(client.auth_type, "BASIC")
         self.assertEqual(client.access_token, None)
 
     @patch("tap_zuora.client.get_access_token", return_value="dummy_token")
     @patch("tap_zuora.client.Client.get_url")
     def test_existing_connection_with_auth_type_oauth(self, mock_get_url, mock_get_access_token):
         """
-        Test to ensure that an auth_type is set to OAuth when auth_type is set to OAuth in the config
+        Test to ensure that an auth_type is set to OAUTH when auth_type is set to OAUTH in the config
         """
         config = {
             "username": "test_user",
             "password": "test_pass",
-            "auth_type": "OAuth",
+            "auth_type": "OAUTH",
         }
         client = Client.from_config(config)
-        self.assertEqual(client.auth_type, "OAuth")
+        self.assertEqual(client.auth_type, "OAUTH")
         self.assertEqual(client.access_token, "dummy_token")
