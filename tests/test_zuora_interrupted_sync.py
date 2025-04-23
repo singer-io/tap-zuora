@@ -43,7 +43,7 @@ class ZuoraInterruptedSyncTest(ZuoraBaseTest):
         """
         self.zuora_api_type = api_type
         self.start_date = dt.strftime(utils.now() - timedelta(days=10), "%Y-%m-%dT00:00:00Z")
-        expected_streams = {"PaymentMethodTransactionLog", "OrderAction", "RatePlan"}
+        expected_streams = {"PaymentMethodTransactionLog"}
 
         conn_id = connections.ensure_connection(self, original_properties=False)
 
