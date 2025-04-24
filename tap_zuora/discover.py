@@ -39,7 +39,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
         "RemovedRatePlanId",
         "SubType",
     ],
-    "BillingRun": ["BillingRunType", "NumberOfCreditMemos", "PostedDate", "Name"],
+    "BillingRun": ["BillingRunType", "NumberOfCreditMemos", "PostedDate", "Name", "IncludeOrderLineItems", "IncludeSubscriptions"],
     "Contact": ["AsBillTo", "AsShipTo", "AsSoldTo"],
     "Export": ["Encoding", "SnowflakeWarehouse", "SourceData", "WarehouseSize"],
     "Invoice": ["PaymentTerm",

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.1
+  * Remove unsupported fields `IncludeOrderLineItems` and `IncludeSubscriptions` from `BillingRun` stream [#81](https://github.com/singer-io/tap-zuora/pull/81)
+
 ## 1.5.0
   * Add oauth option for authorization [#79](https://github.com/singer-io/tap-zuora/pull/79)
 

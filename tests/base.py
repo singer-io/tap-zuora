@@ -564,15 +564,16 @@ class ZuoraBaseTest(unittest.TestCase):
             interrupted_stream_bookmark = bookmark_state.get(interrupt_stream, {})
             interrupted_stream_bookmark.pop("offset", None)
             interrupted_stream_rec = []
-            for record in sync_records.get(interrupt_stream).get("messages"):
+            for record in sync_records.get(interrupt_stream, {}).get("messages", []):
                 if record.get("action") == "upsert":
                     rec = record.get("data")
                     interrupted_stream_rec.append(rec)
 
             # Set a deferred bookmark value for both the bookmarks of chat stream
-            rec_index = len(interrupted_stream_rec) // 2 if len(interrupted_stream_rec) > 1 else 0
-            interrupted_stream_bookmark[replication_key] = interrupted_stream_rec[rec_index][replication_key]
+            if len(interrupted_stream_rec) > 0:
+                rec_index = len(interrupted_stream_rec) // 2
+                interrupted_stream_bookmark[replication_key] = interrupted_stream_rec[rec_index][replication_key]
 
-            bookmark_state[interrupt_stream] = interrupted_stream_bookmark
-            interrupted_sync_states["bookmarks"] = bookmark_state
+                bookmark_state[interrupt_stream] = interrupted_stream_bookmark
+                interrupted_sync_states["bookmarks"] = bookmark_state
         return interrupted_sync_states
