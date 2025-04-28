@@ -26,9 +26,13 @@ URLS = {
     (IS_SAND, NOT_EURO): [
         "https://rest.sandbox.na.zuora.com/",
         "https://rest.apisandbox.zuora.com/",
+        "https://rest.test.zuora.com/"
     ],
     (IS_PROD, IS_EURO): ["https://rest.eu.zuora.com/"],
-    (IS_SAND, IS_EURO): ["https://rest.sandbox.eu.zuora.com/"],
+    (IS_SAND, IS_EURO): [
+        "https://rest.sandbox.eu.zuora.com/",
+        "https://rest.test.eu.zuora.com/"
+    ],
 }
 
 LATEST_WSDL_VERSION = "91.0"
