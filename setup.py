@@ -14,7 +14,7 @@ setup(
         "singer-python==5.13.2",
         "requests==2.32.4",
         "pendulum==1.2.0",
-        "backoff==1.8.0",
+        "backoff==1.10.0",
     ],
     extras_require={"dev": ["ipdb", "pylint"]},
     entry_points="""
