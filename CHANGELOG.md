@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.2
+  * Bump dependency versions for twistlock compliance [#82](https://github.com/singer-io/tap-zuora/pull/82)
+
 ## 1.5.1
   * Remove unsupported fields `IncludeOrderLineItems` and `IncludeSubscriptions` from `BillingRun` stream [#81](https://github.com/singer-io/tap-zuora/pull/81)
 
