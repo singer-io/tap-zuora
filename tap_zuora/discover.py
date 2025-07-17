@@ -14,6 +14,7 @@ TYPE_MAP = {
     "boolean": "boolean",
     "integer": "integer",
     "decimal": "number",
+    "number": "number",
     "date": "date",
     "datetime": "datetime",
 }
@@ -46,7 +47,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
         "CommunicationProfileId"
     ],
     "OrderLineItem": ["CommunicationProfileId", "ShipTo"],
-    "RatePlanCharge": ["RatePlanCharge"],
+    "RatePlanCharge": ["RatePlanCharge", "UpsellOriginChargeNumber"],
     "Subscription": ["CommunicationProfileId", "OrderId"],
 }
 
