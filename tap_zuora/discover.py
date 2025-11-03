@@ -56,6 +56,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                 "InvoiceGroupNumber",
                 "PaymentLink",
                 "SequenceSetId",
+                "CommunicationProfileId"
     ],
     "InvoiceItem": ["Balance",
                     "ExcludeItemBillingFromRevenueAccounting",
