@@ -227,7 +227,8 @@ class ZuoraBaseTest(unittest.TestCase):
             "PaymentMethodPriority": incremental_updated_date,
             "GatewayProfileData": incremental_updated_date,
             "BillingPreviewRunResult": incremental_updated_date,
-            "RevenueRecognitionEventsTransaction": incremental_updated_date
+            "RevenueRecognitionEventsTransaction": incremental_updated_date,
+            "NotificationHistoryEmailEvent": incremental_updated_date,
         }
 
     def rest_only_streams(self):
