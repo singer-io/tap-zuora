@@ -31,6 +31,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                 "PaymentMethodCascadingConsent",
                 "RollUpUsage",
                 "PaymentMethodPriorityId",
+                "CommunicationProfileId"
     ],
     "Amendment": [
         "BookingDate",
@@ -67,8 +68,8 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                     "SubscriptionNumber",
     ],
     "InvoiceItemAdjustment": ["ExcludeItemBillingFromRevenueAccounting"],
-    "OrderAction": ["ClearingExistingShipToContact"],
-    "OrderLineItem": ["ShipTo"],
+    "OrderAction": ["ClearingExistingShipToContact", "CommunicationProfileId"],
+    "OrderLineItem": ["ShipTo", "CommunicationProfileId"],
     "PaymentMethod": ["StoredCredentialProfileId", "PaymentMethodTokenId"],
     "Product": ["ProductNumber"],
     "ProductRatePlanCharge": [
@@ -139,6 +140,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                      "InvoiceGroupNumber",
                      "InvoiceTemplateId",
                      "SequenceSetId",
+                     "CommunicationProfileId"
     ],
     "TaxationItem": ["Balance", "CreditAmount", "PaymentAmount"],
     "Usage": ["ImportId"],
