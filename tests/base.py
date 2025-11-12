@@ -305,6 +305,7 @@ class ZuoraBaseTest(unittest.TestCase):
             "FulfillmentItem",
             "BillingPreviewRunResult",
             "RevenueRecognitionEventsTransaction",
+            "NotificationHistoryEmailEvent",
         }
 
     def expected_streams(self):

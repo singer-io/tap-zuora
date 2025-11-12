@@ -31,7 +31,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                 "PaymentMethodCascadingConsent",
                 "RollUpUsage",
                 "PaymentMethodPriorityId",
-                "CommunicationProfileId"
+                "CommunicationProfileId",
     ],
     "Amendment": [
         "BookingDate",
@@ -57,7 +57,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                 "InvoiceGroupNumber",
                 "PaymentLink",
                 "SequenceSetId",
-                "CommunicationProfileId"
+                "CommunicationProfileId",
     ],
     "InvoiceItem": ["Balance",
                     "ExcludeItemBillingFromRevenueAccounting",
@@ -140,7 +140,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                      "InvoiceGroupNumber",
                      "InvoiceTemplateId",
                      "SequenceSetId",
-                     "CommunicationProfileId"
+                     "CommunicationProfileId",
     ],
     "TaxationItem": ["Balance", "CreditAmount", "PaymentAmount"],
     "Usage": ["ImportId"],
