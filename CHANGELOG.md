@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.3
+  * Add `CommunicationProfileId` to the `UNSUPPORTED_FIELDS_FOR_REST` for multiple streams [#86](https://github.com/singer-io/tap-zuora/pull/86)
+
 ## 1.5.2
   * Bump dependency versions for twistlock compliance [#82](https://github.com/singer-io/tap-zuora/pull/82)
 
