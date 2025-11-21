@@ -38,8 +38,8 @@ def parse_header_line(line, stream: str) -> List:
 
 
 def poll_job_until_done(job_id: str, client: Client, api: Union[Type[apis.Rest], Type[apis.Aqua]]) -> List:
-    timeout_time = pendulum.utcnow().add(seconds=DEFAULT_JOB_TIMEOUT)
-    while pendulum.utcnow() < timeout_time:
+    timeout_time = pendulum.now("UTC").add(seconds=DEFAULT_JOB_TIMEOUT)
+    while pendulum.now("UTC") < timeout_time:
         if api.job_ready(client, job_id):
             return api.get_file_ids(client, job_id)
 
@@ -141,7 +141,7 @@ def handle_aqua_timeout(ex: apis.ExportTimedOut, stream: Dict, state: Dict):
         return
     LOGGER.info("Export timed out, reducing query window and writing state.")
     window_bookmark = state["bookmarks"][stream["tap_stream_id"]].get("current_window_end")
-    previous_window_end = pendulum.parse(window_bookmark) if window_bookmark else pendulum.utcnow()
+    previous_window_end = pendulum.parse(window_bookmark) if window_bookmark else pendulum.now("UTC")
     window_start = pendulum.parse(state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]])
     if previous_window_end == window_start:
         raise apis.ExportFailed(
@@ -243,7 +243,7 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
     if stream.get("replication_key"):
         bookmark_window_length = state["bookmarks"][stream["tap_stream_id"]].pop("window_length", None)
         window_length_in_seconds = bookmark_window_length or MAX_EXPORT_DAYS * 86400
-        sync_started = pendulum.utcnow()
+        sync_started = pendulum.now("UTC")
         start_date = state["bookmarks"][stream["tap_stream_id"]][stream["replication_key"]]
         start_pen = pendulum.parse(start_date)
         try:

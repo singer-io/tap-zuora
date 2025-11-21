@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+  * Update libraries [#87] (https://github.com/singer-io/tap-zuora/pull/87)
+  * Code Refactoring [#86](https://github.com/singer-io/tap-zuora/pull/86)
+   - Add `CommunicationProfileId` to the `UNSUPPORTED_FIELDS_FOR_REST` for multiple streams
+   - Included `NotificationHistoryEmailEvent` in the expected streams for both REST and BULK (AQUA) APIs to ensure catalog discovery
+
 ## 1.5.2
   * Bump dependency versions for twistlock compliance [#82](https://github.com/singer-io/tap-zuora/pull/82)
 
