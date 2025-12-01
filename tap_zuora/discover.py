@@ -68,7 +68,10 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                     "SubscriptionNumber",
     ],
     "InvoiceItemAdjustment": ["ExcludeItemBillingFromRevenueAccounting"],
-    "OrderAction": ["ClearingExistingShipToContact", "CommunicationProfileId"],
+    "OrderAction": ["ClearingExistingShipToContact",
+                    "CommunicationProfileId",
+                    "ClearingExistingCommunicationProfile"
+    ],
     "OrderLineItem": ["ShipTo", "CommunicationProfileId"],
     "PaymentMethod": ["StoredCredentialProfileId", "PaymentMethodTokenId"],
     "Product": ["ProductNumber"],
