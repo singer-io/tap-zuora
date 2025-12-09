@@ -133,6 +133,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
         "RolloverPeriodLength",
         "RolloverPeriods",
         "SpecificListPriceBase",
+        "UpsellOriginChargeNumber",
     ],
     "RevenueRecognitionEventsTransaction": ["UsageChargeName", "UsageChargeNumber"],
     "Subscription": ["IsLatestVersion",
