@@ -145,7 +145,8 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                      "InvoiceTemplateId",
                      "SequenceSetId",
                      "CommunicationProfileId",
-    ],
+                     "OrderId"
+                     ],
     "TaxationItem": ["Balance", "CreditAmount", "PaymentAmount"],
     "Usage": ["ImportId"],
 }
