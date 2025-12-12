@@ -68,7 +68,10 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                     "SubscriptionNumber",
     ],
     "InvoiceItemAdjustment": ["ExcludeItemBillingFromRevenueAccounting"],
-    "OrderAction": ["ClearingExistingShipToContact", "CommunicationProfileId"],
+    "OrderAction": ["ClearingExistingShipToContact",
+                    "CommunicationProfileId",
+                    "ClearingExistingCommunicationProfile"
+    ],
     "OrderLineItem": ["ShipTo", "CommunicationProfileId"],
     "PaymentMethod": ["StoredCredentialProfileId", "PaymentMethodTokenId"],
     "Product": ["ProductNumber"],
@@ -130,6 +133,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
         "RolloverPeriodLength",
         "RolloverPeriods",
         "SpecificListPriceBase",
+        "UpsellOriginChargeNumber",
     ],
     "RevenueRecognitionEventsTransaction": ["UsageChargeName", "UsageChargeNumber"],
     "Subscription": ["IsLatestVersion",
@@ -141,7 +145,8 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                      "InvoiceTemplateId",
                      "SequenceSetId",
                      "CommunicationProfileId",
-    ],
+                     "OrderId"
+                     ],
     "TaxationItem": ["Balance", "CreditAmount", "PaymentAmount"],
     "Usage": ["ImportId"],
 }
