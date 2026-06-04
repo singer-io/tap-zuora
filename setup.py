@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="tap-zuora",
-    version="1.6.0",
+    version="1.6.1",
     description="Singer.io tap for extracting data from the Zuora API",
     author="Stitch",
     url="https://singer.io",
@@ -12,7 +12,7 @@ setup(
     py_modules=["tap_zuora"],
     install_requires=[
         "singer-python==6.1.1",
-        "requests==2.32.4",
+        "requests==2.33.0",
         "pendulum==3.1.0",
         "backoff==2.2.1",
     ],

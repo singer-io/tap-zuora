@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.6.1
+  * Bump requests to 2.33.0 for security updates [#77](https://github.com/singer-io/tap-zuora/pull/77)
+
+
 ## 1.6.0
   * Add `CommunicationProfileId` and `OrderId` in unsupported discovery fields [#88](https://github.com/singer-io/tap-zuora/pull/88)
   * Update libraries [#87](https://github.com/singer-io/tap-zuora/pull/87)
