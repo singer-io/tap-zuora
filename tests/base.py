@@ -229,6 +229,10 @@ class ZuoraBaseTest(unittest.TestCase):
             "BillingPreviewRunResult": incremental_updated_date,
             "RevenueRecognitionEventsTransaction": incremental_updated_date,
             "NotificationHistoryEmailEvent": incremental_updated_date,
+            "ChargeMetricsTcb": incremental_updated_date,
+            "ChargeMetricsTcbDiscount": incremental_updated_date,
+            "RatePlanMetricsSummary": incremental_updated_date,
+            "SubscriptionMetricsSummary": incremental_updated_date,
         }
 
     def rest_only_streams(self):
@@ -306,6 +310,10 @@ class ZuoraBaseTest(unittest.TestCase):
             "BillingPreviewRunResult",
             "RevenueRecognitionEventsTransaction",
             "NotificationHistoryEmailEvent",
+            "ChargeMetricsTcb",
+            "ChargeMetricsTcbDiscount",
+            "RatePlanMetricsSummary",
+            "SubscriptionMetricsSummary",
         }
 
     def expected_streams(self):
