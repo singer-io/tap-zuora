@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Union
 
 import pendulum
@@ -54,6 +55,34 @@ def format_datetime_zoql(datetime_str: str, date_format: str):
 
 class ExportFailed(Exception):
     pass
+
+
+class InvalidFieldExportFailed(ExportFailed):
+    """Export failed because a field in the query doesn't exist on this tenant."""
+    def __init__(self, message: str, invalid_fields: List[str]):
+        super().__init__(message)
+        self.invalid_fields = invalid_fields
+
+
+_INVALID_FIELD_RE = re.compile(r"There is no field named (\w+)\.")
+
+
+def parse_invalid_fields(message: str) -> List[str]:
+    return _INVALID_FIELD_RE.findall(message)
+
+
+def parse_invalid_fields_from_response(resp) -> List[str]:
+    """Extracts invalid field names from a Zuora REST 400 {"Errors": [...]} body."""
+    try:
+        errors = resp.json().get("Errors", [])
+    except ValueError:
+        return []
+
+    invalid_fields = []
+    for error in errors:
+        if error.get("Code") == "INVALID_VALUE":
+            invalid_fields.extend(parse_invalid_fields(error.get("Message", "")))
+    return invalid_fields
 
 
 class ExportTimedOut(ExportFailed):
@@ -194,7 +223,11 @@ class Aqua:
         if data["status"] == "completed":
             return True
         elif data["status"] == "failed":
-            raise ExportFailed(data["batches"][0]["message"])
+            message = data["batches"][0]["message"]
+            invalid_fields = parse_invalid_fields(message)
+            if invalid_fields:
+                raise InvalidFieldExportFailed(message, invalid_fields)
+            raise ExportFailed(message)
         else:
             return False
 
@@ -265,7 +298,11 @@ class Rest:
         if data["Status"] == "Completed":
             return True
         elif data["Status"] in ["Cancelled", "Failed"]:
-            raise ExportFailed(data["StatusReason"])
+            message = data["StatusReason"]
+            invalid_fields = parse_invalid_fields(message)
+            if invalid_fields:
+                raise InvalidFieldExportFailed(message, invalid_fields)
+            raise ExportFailed(message)
         else:
             return False
 

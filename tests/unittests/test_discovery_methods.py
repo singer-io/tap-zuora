@@ -31,10 +31,10 @@ class TestDiscoveryMethods(unittest.TestCase):
 
     def test_is_unsupported_field_aqua(self):
         """Test to ensure whether a field is unsupported for a given stream for
-        AQuA API Calls."""
+        AQuA API Calls it should always be False for AQuA calls."""
         stream = "Invoice"
         field = "SourceType"
-        self.assertEqual(discover.is_unsupported_field(stream, field, False), True)
+        self.assertEqual(discover.is_unsupported_field(stream, field, False), False)
 
     @mock.patch("tap_zuora.client.Client.rest_request")
     @mock.patch("requests.Session.send")

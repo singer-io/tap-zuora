@@ -72,7 +72,7 @@ UNSUPPORTED_FIELDS_FOR_REST = {
                     "CommunicationProfileId",
                     "ClearingExistingCommunicationProfile"
     ],
-    "OrderLineItem": ["ShipTo", "CommunicationProfileId", "RevenueAmortizationMethod"],
+    "OrderLineItem": ["ShipTo", "CommunicationProfileId"],
     "PaymentMethod": ["StoredCredentialProfileId", "PaymentMethodTokenId"],
     "Product": ["ProductNumber"],
     "ProductRatePlanCharge": [
@@ -236,10 +236,11 @@ def discover_stream_names(client: Client):
     return [t.text for t in etree.findall("./object/name")]
 
 
-def is_unsupported_field(stream_name: str, field_name: str, is_rest: bool = True) -> bool:
-    """Checks whether a given field for a given stream is supported."""
+def is_unsupported_field(stream_name: str, field_name: str, is_rest: bool) -> bool:
+    """Checks whether a given field for a given stream is supported, applicable
+    only for REST api calls."""
     unsupported_fields = UNSUPPORTED_FIELDS_FOR_REST.get(stream_name, [])
-    return bool(unsupported_fields and field_name in unsupported_fields)
+    return bool(unsupported_fields and is_rest and field_name in unsupported_fields)
 
 
 def discover_stream(client: Client, stream_name: str) -> Union[Dict, None]:
