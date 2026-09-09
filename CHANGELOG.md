@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+  * Handle Zuora invalid-field export errors by excluding rejected fields and retrying the stream [#91](https://github.com/singer-io/tap-zuora/pull/91)
+
 # 1.6.1
   * Bump requests to 2.33.0 for security updates [#77](https://github.com/singer-io/tap-zuora/pull/77)
 

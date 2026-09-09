@@ -284,9 +284,8 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
 
 def sync_stream(client: Client, state: Dict, stream: Dict):
     """Starts the process for syncing the data for a given stream."""
-    invalid_field_retries = 0
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
-        while True:
+        for invalid_field_retries in range(MAX_INVALID_FIELD_RETRIES + 1):
             try:
                 if client.is_rest:
                     counter = sync_rest_stream(client, state, stream, counter)
@@ -294,9 +293,8 @@ def sync_stream(client: Client, state: Dict, stream: Dict):
                     counter = sync_aqua_stream(client, state, stream, counter)
                 break
             except apis.InvalidFieldExportFailed as ex:
-                if invalid_field_retries >= MAX_INVALID_FIELD_RETRIES:
+                if invalid_field_retries == MAX_INVALID_FIELD_RETRIES:
                     raise
-                invalid_field_retries += 1
                 LOGGER.warning(
                     f"Export for {stream['tap_stream_id']} rejected field(s) {ex.invalid_fields}, "
                     f"retrying without them."
