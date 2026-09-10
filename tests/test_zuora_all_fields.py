@@ -28,7 +28,8 @@ class ZuoraAllFields(ZuoraBaseTest):
     the replication of all fields."""
 
     def name(self):
-        return "tap_tester_zuora_all_fields_test"
+        api_type = getattr(self, "zuora_api_type", "").lower() or "default"
+        return f"tap_tester_zuora_all_fields_test_{api_type}"
 
     def test_run(self):
         """Executing tap-tester scenarios for both types of zuora APIs AQUA and
@@ -45,7 +46,7 @@ class ZuoraAllFields(ZuoraBaseTest):
         self.zuora_api_type = api_type
 
         # Streams to verify all fields tests
-        expected_streams = {"Account"}
+        expected_streams = {"Account", "OrderLineItem"}
         self.assertNotEqual(JIRA_CLIENT.get_status_category('TDL-26953'),
                     'done',
                     msg='JIRA ticket has moved to done, re-add RefundTransactionLog stream to testable streams')
@@ -90,14 +91,17 @@ class ZuoraAllFields(ZuoraBaseTest):
                     msg=f"{expected_automatic_keys - expected_all_keys} is not in 'expected_all_keys'",
                 )
 
-                messages = synced_records.get(stream)
+                messages = synced_records.get(stream, {}).get("messages", [])
+                upsert_messages = [message for message in messages if message["action"] == "upsert"]
+                if not upsert_messages:
+                    continue
+
                 # Collect actual values
                 actual_all_keys = set()
                 expected_all_keys = (
                     expected_all_keys - {"Deleted"} if stream in DOES_NOT_SUPPORT_DELETED else expected_all_keys
                 )
-                for message in messages["messages"]:
-                    if message["action"] == "upsert":
-                        actual_all_keys.update(message["data"].keys())
+                for message in upsert_messages:
+                    actual_all_keys.update(message["data"].keys())
                 # Verify all fields for each stream are replicated
                 self.assertSetEqual(expected_all_keys, actual_all_keys)
