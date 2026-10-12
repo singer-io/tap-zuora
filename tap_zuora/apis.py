@@ -116,6 +116,7 @@ class Aqua:
         "SmartPreventionAudit",
         "HpmCaptchaValidationResult",
         "EmailHistory",
+        "GatewayProfileData",
     ]
 
     @staticmethod
