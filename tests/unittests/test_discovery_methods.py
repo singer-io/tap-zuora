@@ -87,7 +87,7 @@ class TestDiscoveryMethods(unittest.TestCase):
                     "Id": {"type": ["integer", "null"]},
                     "UpdatedOn": {"type": ["string", "null"]},
                     "Stream3Id": {"type": ["string", "null"]},
-                    "Deleted": {"type": "boolean"},
+                    "Deleted": {"type": ["boolean", "null"]},
                 },
             },
             "metadata": [
@@ -129,3 +129,14 @@ class TestDiscoveryMethods(unittest.TestCase):
         }
 
         self.assertEqual(discover.discover_stream(client_object, "Stream1"), expected_response)
+
+    @mock.patch("tap_zuora.discover.apis.Aqua.stream_status", return_value="available_with_deleted")
+    @mock.patch("tap_zuora.discover.get_field_dict")
+    def test_no_deleted_column_for_unsupported_aqua_stream(self, mock_field_dict, mock_stream_status):
+        client = mock.Mock(is_rest=False)
+        mock_field_dict.return_value = FIELD_RESPONSE
+
+        stream = discover.discover_stream(client, "CalloutHistory")
+
+        self.assertNotIn("Deleted", stream["schema"]["properties"])
+        self.assertFalse(any(entry["breadcrumb"] == ("properties", "Deleted") for entry in stream["metadata"]))
