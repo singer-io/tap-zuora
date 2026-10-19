@@ -1,3 +1,4 @@
+import copy
 import json
 import pathlib
 import unittest
@@ -8,7 +9,9 @@ from utils import get_response
 
 from tap_zuora.apis import (
     Aqua,
+    ExportFailed,
     InvalidFieldExportFailed,
+    NO_DELETED_SUPPORT,
     Rest,
     parse_invalid_fields,
     parse_invalid_fields_from_response,
@@ -21,6 +24,64 @@ with p.open("r") as f:
 
 
 class TestAquaApis(unittest.TestCase):
+    def test_create_job_retries_without_deleted(self):
+        stream = copy.deepcopy(STREAM_METADATA)
+        stream["schema"]["properties"]["Deleted"] = {"type": ["boolean", "null"]}
+        stream["metadata"].append({
+            "breadcrumb": ["properties", "Deleted"],
+            "metadata": {"selected": True, "inclusion": "available"},
+        })
+        state = {"bookmarks": {"Stream1": {"version": 123456, "UpdatedDate": "2022-10-01T00:00:00Z"}}}
+        client = mock.Mock(spec=Client, partner_id="partner_id")
+        client.aqua_request.side_effect = [
+            get_response(200, json={"message": NO_DELETED_SUPPORT}),
+            get_response(200, json={"id": "job123"}),
+        ]
+        expected_payload = Aqua.get_payload(state, stream, client.partner_id)
+        self.assertIn("deleted", expected_payload["queries"][0])
+
+        self.assertEqual(Aqua.create_job(client, state, stream), "job123")
+
+        retry_payload = copy.deepcopy(expected_payload)
+        del retry_payload["queries"][0]["deleted"]
+        self.assertEqual(client.aqua_request.call_args_list, [
+            mock.call("POST", "v1/batch-query/", json=expected_payload),
+            mock.call("POST", "v1/batch-query/", json=retry_payload),
+        ])
+
+    def test_create_job_does_not_retry_unrelated_errors_or_missing_deleted(self):
+        state = {"bookmarks": {"Stream1": {"version": 123456, "UpdatedDate": "2022-10-01T00:00:00Z"}}}
+        for message, deleted in (
+            (NO_DELETED_SUPPORT, False),
+            ("Unrelated export error", False),
+            ("Unrelated export error", True),
+        ):
+            with self.subTest(message=message, deleted=deleted):
+                client = mock.Mock(spec=Client, partner_id="partner_id")
+                client.aqua_request.return_value = get_response(200, json={"message": message})
+                payload = Aqua.get_payload(state, STREAM_METADATA, client.partner_id)
+                if deleted:
+                    payload["queries"][0]["deleted"] = {"column": "Deleted", "format": "Boolean"}
+                with mock.patch.object(Aqua, "get_payload", return_value=payload):
+                    with self.assertRaisesRegex(ExportFailed, message):
+                        Aqua.create_job(client, state, STREAM_METADATA)
+                client.aqua_request.assert_called_once()
+
+    def test_create_job_retry_is_bounded(self):
+        state = {"bookmarks": {"Stream1": {"version": 123456}}}
+        payload = {"queries": [{"query": "select Id from Stream1", "deleted": {"column": "Deleted"}}]}
+        for message in (NO_DELETED_SUPPORT, "Retry failed"):
+            with self.subTest(message=message):
+                client = mock.Mock(spec=Client, partner_id="partner_id")
+                client.aqua_request.side_effect = [
+                    get_response(200, json={"message": NO_DELETED_SUPPORT}),
+                    get_response(200, json={"message": message}),
+                ]
+                with mock.patch.object(Aqua, "get_payload", return_value=payload):
+                    with self.assertRaisesRegex(ExportFailed, message):
+                        Aqua.create_job(client, state, STREAM_METADATA)
+                self.assertEqual(client.aqua_request.call_count, 2)
+
     def test_get_query(self):
         """Test to ensure we get correct SQL query based on stream metadata for
         AQuA calls."""
