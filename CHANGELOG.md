@@ -2,6 +2,7 @@
 
 ## 1.6.2
   * Handle Zuora invalid-field export errors by excluding rejected fields and retrying the stream [#91](https://github.com/singer-io/tap-zuora/pull/91)
+  * Make the AQuA `Deleted` field nullable, omit it for streams that do not support deleted-record exports, and retry without deletion tracking when Zuora rejects it [#92](https://github.com/singer-io/tap-zuora/pull/92)
 
 # 1.6.1
   * Bump requests to 2.33.0 for security updates [#77](https://github.com/singer-io/tap-zuora/pull/77)
