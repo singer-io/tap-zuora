@@ -64,11 +64,11 @@ class InvalidFieldExportFailed(ExportFailed):
         self.invalid_fields = invalid_fields
 
 
-_INVALID_FIELD_RE = re.compile(r"There is no field named (\w+)\.")
+_INVALID_FIELD_RE = re.compile(r"There is no field named (\w+(?:\.\w+)*)\.")
 
 
 def parse_invalid_fields(message: str) -> List[str]:
-    return _INVALID_FIELD_RE.findall(message)
+    return [field_name.replace(".", "") for field_name in _INVALID_FIELD_RE.findall(message)]
 
 
 def parse_invalid_fields_from_response(resp) -> List[str]:
