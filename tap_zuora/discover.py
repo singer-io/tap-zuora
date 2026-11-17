@@ -309,8 +309,8 @@ def discover_stream(client: Client, stream_name: str) -> Union[Dict, None]:
     if status == "unavailable":
         LOGGER.info(f"Stream {stream_name} is unavailable to export")
         return None
-    elif status == "available_with_deleted":
-        properties["Deleted"] = {"type": "boolean"}
+    elif status == "available_with_deleted" and stream_name not in apis.Aqua.DOES_NOT_SUPPORT_DELETED:
+        properties["Deleted"] = {"type": ["boolean", "null"]}
         mdata = metadata.write(mdata, ("properties", "Deleted"), "inclusion", "available")
 
     return {

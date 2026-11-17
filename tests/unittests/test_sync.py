@@ -30,6 +30,35 @@ class TestMarkFieldsUnsupported(unittest.TestCase):
 
 class TestSyncStreamInvalidFieldRetry(unittest.TestCase):
     @mock.patch("tap_zuora.sync.sync_aqua_stream")
+    def test_sync_stream_retries_without_invalid_joined_field(self, mock_sync_aqua_stream):
+        stream = copy.deepcopy(STREAM_METADATA)
+        stream["schema"]["properties"]["Stream3Id"] = {"type": ["string", "null"]}
+        stream["metadata"].append({
+            "breadcrumb": ["properties", "Stream3Id"],
+            "metadata": {
+                "inclusion": "available",
+                "selected": True,
+                "tap-zuora.joined_object": "Stream3",
+            },
+        })
+        api_client = mock.Mock()
+        api_client.aqua_request.return_value.json.return_value = {
+            "status": "failed",
+            "batches": [{"message": "There is no field named Stream3.Id."}],
+        }
+        with self.assertRaises(apis.InvalidFieldExportFailed) as ctx:
+            apis.Aqua.job_ready(api_client, "job123")
+
+        self.assertEqual(ctx.exception.invalid_fields, ["Stream3Id"])
+        client = mock.Mock(is_rest=False)
+        mock_sync_aqua_stream.side_effect = [ctx.exception, "counter"]
+
+        self.assertEqual(sync.sync_stream(client, {}, stream), "counter")
+
+        self.assertEqual(mock_sync_aqua_stream.call_count, 2)
+        self.assertNotIn("Stream3.Id", apis.Aqua.get_query(stream))
+
+    @mock.patch("tap_zuora.sync.sync_aqua_stream")
     def test_sync_stream_retries_without_invalid_field(self, mock_sync_aqua_stream):
         """Test to ensure sync_stream drops an invalid field and retries the
         sync instead of failing immediately."""

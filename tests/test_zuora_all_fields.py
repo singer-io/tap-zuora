@@ -20,6 +20,7 @@ DOES_NOT_SUPPORT_DELETED = [
     "SmartPreventionAudit",
     "HpmCaptchaValidationResult",
     "EmailHistory",
+    "GatewayProfileData",
 ]
 
 
