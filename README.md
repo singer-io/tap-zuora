@@ -40,6 +40,21 @@ $ tap-zuora --config config.json --discover
 A discovered catalog is output, with a JSON-schema description of each table. A
 source table directly corresponds to a Singer stream.
 
+### Updating existing connections after discovery changes
+
+Sync uses the catalog supplied to the tap; upgrading the tap does not refresh a
+connection's saved catalog. After upgrading, run discovery again and update the
+connection's saved catalog, preserving its stream and field selections. The new
+catalog makes `Deleted` nullable for streams that support deletion tracking and
+omits it for streams that do not.
+
+After the catalog update, verify the target schema for affected tables. The tap
+emits the updated Singer schema but does not alter target database constraints.
+Whether an existing target column is made nullable or removed automatically is
+target-specific. If it remains `NOT NULL` or otherwise conflicts with the new
+schema, apply the target's supported schema migration manually before resuming
+the load.
+
 ### Field selection
 
 In sync mode, `tap-zuora` consumes the catalog and looks for streams that have been

@@ -1,8 +1,22 @@
+import copy
 import json
 import pathlib
 import unittest
+from unittest import mock
 
-from tap_zuora.apis import Aqua, Rest
+import requests
+from utils import get_response
+
+from tap_zuora.apis import (
+    Aqua,
+    ExportFailed,
+    InvalidFieldExportFailed,
+    NO_DELETED_SUPPORT,
+    Rest,
+    parse_invalid_fields,
+    parse_invalid_fields_from_response,
+)
+from tap_zuora.client import Client
 
 p = pathlib.Path(__file__).with_name("sample_stream_metadata.json")
 with p.open("r") as f:
@@ -10,6 +24,64 @@ with p.open("r") as f:
 
 
 class TestAquaApis(unittest.TestCase):
+    def test_create_job_retries_without_deleted(self):
+        stream = copy.deepcopy(STREAM_METADATA)
+        stream["schema"]["properties"]["Deleted"] = {"type": ["boolean", "null"]}
+        stream["metadata"].append({
+            "breadcrumb": ["properties", "Deleted"],
+            "metadata": {"selected": True, "inclusion": "available"},
+        })
+        state = {"bookmarks": {"Stream1": {"version": 123456, "UpdatedDate": "2022-10-01T00:00:00Z"}}}
+        client = mock.Mock(spec=Client, partner_id="partner_id")
+        client.aqua_request.side_effect = [
+            get_response(200, json={"message": NO_DELETED_SUPPORT}),
+            get_response(200, json={"id": "job123"}),
+        ]
+        expected_payload = Aqua.get_payload(state, stream, client.partner_id)
+        self.assertIn("deleted", expected_payload["queries"][0])
+
+        self.assertEqual(Aqua.create_job(client, state, stream), "job123")
+
+        retry_payload = copy.deepcopy(expected_payload)
+        del retry_payload["queries"][0]["deleted"]
+        self.assertEqual(client.aqua_request.call_args_list, [
+            mock.call("POST", "v1/batch-query/", json=expected_payload),
+            mock.call("POST", "v1/batch-query/", json=retry_payload),
+        ])
+
+    def test_create_job_does_not_retry_unrelated_errors_or_missing_deleted(self):
+        state = {"bookmarks": {"Stream1": {"version": 123456, "UpdatedDate": "2022-10-01T00:00:00Z"}}}
+        for message, deleted in (
+            (NO_DELETED_SUPPORT, False),
+            ("Unrelated export error", False),
+            ("Unrelated export error", True),
+        ):
+            with self.subTest(message=message, deleted=deleted):
+                client = mock.Mock(spec=Client, partner_id="partner_id")
+                client.aqua_request.return_value = get_response(200, json={"message": message})
+                payload = Aqua.get_payload(state, STREAM_METADATA, client.partner_id)
+                if deleted:
+                    payload["queries"][0]["deleted"] = {"column": "Deleted", "format": "Boolean"}
+                with mock.patch.object(Aqua, "get_payload", return_value=payload):
+                    with self.assertRaisesRegex(ExportFailed, message):
+                        Aqua.create_job(client, state, STREAM_METADATA)
+                client.aqua_request.assert_called_once()
+
+    def test_create_job_retry_is_bounded(self):
+        state = {"bookmarks": {"Stream1": {"version": 123456}}}
+        payload = {"queries": [{"query": "select Id from Stream1", "deleted": {"column": "Deleted"}}]}
+        for message in (NO_DELETED_SUPPORT, "Retry failed"):
+            with self.subTest(message=message):
+                client = mock.Mock(spec=Client, partner_id="partner_id")
+                client.aqua_request.side_effect = [
+                    get_response(200, json={"message": NO_DELETED_SUPPORT}),
+                    get_response(200, json={"message": message}),
+                ]
+                with mock.patch.object(Aqua, "get_payload", return_value=payload):
+                    with self.assertRaisesRegex(ExportFailed, message):
+                        Aqua.create_job(client, state, STREAM_METADATA)
+                self.assertEqual(client.aqua_request.call_count, 2)
+
     def test_get_query(self):
         """Test to ensure we get correct SQL query based on stream metadata for
         AQuA calls."""
@@ -69,3 +141,86 @@ class TestRestApis(unittest.TestCase):
             Rest.get_payload(STREAM_METADATA, "2022-10-01", "2022-10-17"),
             expected_payload,
         )
+
+    @mock.patch("tap_zuora.client.Client.rest_request")
+    @mock.patch("requests.Session.send")
+    @mock.patch("requests.Request")
+    def test_job_ready_raises_invalid_field_export_failed(self, mock_request, mock_send, mock_rest_request):
+        """Test to ensure Rest.job_ready raises InvalidFieldExportFailed when
+        Zuora rejects a field that doesn't exist on this tenant."""
+        mock_request.return_value = requests.Request()
+        mock_send.return_value = get_response(200, json={"id": 1234})
+        client_object = Client.from_config({"username": "", "password": ""})
+        mock_rest_request.return_value = get_response(
+            200,
+            json={
+                "Status": "Failed",
+                "StatusReason": "OrderLineItem - Invalid Values in Request (400), Errors: "
+                "[{'Message': 'There is no field named RevenueAmortizationMethod.', "
+                "'Code': 'INVALID_VALUE'}]",
+            },
+        )
+        with self.assertRaises(InvalidFieldExportFailed) as ctx:
+            Rest.job_ready(client_object, "job123")
+        self.assertEqual(ctx.exception.invalid_fields, ["RevenueAmortizationMethod"])
+
+
+class TestInvalidFieldParsing(unittest.TestCase):
+    def test_parse_invalid_fields(self):
+        """Test to ensure we correctly extract the invalid field name from a
+        Zuora error message."""
+        message = "There is no field named RevenueAmortizationMethod."
+        self.assertEqual(parse_invalid_fields(message), ["RevenueAmortizationMethod"])
+
+    def test_parse_invalid_fields_no_match(self):
+        """Test to ensure no fields are returned when the message doesn't
+        match the known invalid field pattern."""
+        self.assertEqual(parse_invalid_fields("Some other error"), [])
+
+    def test_parse_invalid_fields_from_response(self):
+        """Test to ensure we extract invalid field names from a Zuora REST
+        400 Errors response body."""
+        resp = get_response(
+            400,
+            json={
+                "Errors": [
+                    {"Message": "There is no field named RevenueAmortizationMethod.", "Code": "INVALID_VALUE"}
+                ]
+            },
+        )
+        self.assertEqual(parse_invalid_fields_from_response(resp), ["RevenueAmortizationMethod"])
+
+    def test_parse_invalid_fields_from_response_ignores_other_errors(self):
+        """Test to ensure non-INVALID_VALUE errors don't contribute field
+        names."""
+        resp = get_response(
+            400,
+            json={"Errors": [{"Message": "Some unrelated failure.", "Code": "OTHER"}]},
+        )
+        self.assertEqual(parse_invalid_fields_from_response(resp), [])
+
+    @mock.patch("tap_zuora.client.Client.aqua_request")
+    @mock.patch("requests.Session.send")
+    @mock.patch("requests.Request")
+    def test_aqua_job_ready_raises_invalid_field_export_failed(self, mock_request, mock_send, mock_aqua_request):
+        """Test to ensure Aqua.job_ready raises InvalidFieldExportFailed when
+        Zuora rejects a field that doesn't exist on this tenant."""
+        mock_request.return_value = requests.Request()
+        mock_send.return_value = get_response(200, json={"id": 1234})
+        client_object = Client.from_config({"username": "", "password": ""})
+        mock_aqua_request.return_value = get_response(
+            200,
+            json={
+                "status": "failed",
+                "batches": [
+                    {
+                        "message": "OrderLineItem - Invalid Values in Request (400), Errors: "
+                        "[{'Message': 'There is no field named RevenueAmortizationMethod.', "
+                        "'Code': 'INVALID_VALUE'}]"
+                    }
+                ],
+            },
+        )
+        with self.assertRaises(InvalidFieldExportFailed) as ctx:
+            Aqua.job_ready(client_object, "job123")
+        self.assertEqual(ctx.exception.invalid_fields, ["RevenueAmortizationMethod"])

@@ -5,7 +5,7 @@ from typing import Dict, List, Type, Union
 
 import pendulum
 import singer
-from singer import transform
+from singer import metadata, transform
 from requests.exceptions import HTTPError
 
 from tap_zuora import apis
@@ -16,6 +16,7 @@ PARTNER_ID = "salesforce"
 DEFAULT_POLL_INTERVAL = 60
 DEFAULT_JOB_TIMEOUT = 12 * 60 * 60  # 12 hrs in seconds
 MAX_EXPORT_DAYS = 30
+MAX_INVALID_FIELD_RETRIES = 5
 
 LOGGER = singer.get_logger()
 
@@ -157,6 +158,18 @@ def handle_aqua_timeout(ex: apis.ExportTimedOut, stream: Dict, state: Dict):
     singer.write_state(state)
 
 
+def mark_fields_unsupported(stream: Dict, field_names: List[str]):
+    """Marks fields as unsupported in the stream's metadata so subsequent
+    queries for this stream exclude them."""
+    mdata = metadata.to_map(stream["metadata"])
+    for field_name in field_names:
+        if field_name not in stream["schema"]["properties"]:
+            continue
+        LOGGER.warning(f"Excluding {stream['tap_stream_id']}.{field_name} - field rejected by Zuora during export")
+        mdata = metadata.write(mdata, ("properties", field_name), "inclusion", "unsupported")
+    stream["metadata"] = metadata.to_list(mdata)
+
+
 def sync_aqua_stream(client: Client, state: Dict, stream: Dict, counter):
     """Performs sync for AQUA mode."""
     try:
@@ -257,6 +270,9 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
                 window_length_in_seconds,
             )
         except HTTPError as ex:
+            invalid_fields = apis.parse_invalid_fields_from_response(ex.response)
+            if invalid_fields:
+                raise apis.InvalidFieldExportFailed(str(ex), invalid_fields) from ex
             raise InvalidValueException(ex.response, stream_name=stream["tap_stream_id"]) from ex
     else:
         job_id = apis.Rest.create_job(client, stream)
@@ -269,9 +285,20 @@ def sync_rest_stream(client: Client, state: Dict, stream: Dict, counter):
 def sync_stream(client: Client, state: Dict, stream: Dict):
     """Starts the process for syncing the data for a given stream."""
     with singer.metrics.record_counter(stream["tap_stream_id"]) as counter:
-        if client.is_rest:
-            counter = sync_rest_stream(client, state, stream, counter)
-        else:
-            counter = sync_aqua_stream(client, state, stream, counter)
+        for invalid_field_retries in range(MAX_INVALID_FIELD_RETRIES + 1):
+            try:
+                if client.is_rest:
+                    counter = sync_rest_stream(client, state, stream, counter)
+                else:
+                    counter = sync_aqua_stream(client, state, stream, counter)
+                break
+            except apis.InvalidFieldExportFailed as ex:
+                if invalid_field_retries == MAX_INVALID_FIELD_RETRIES:
+                    raise
+                LOGGER.warning(
+                    f"Export for {stream['tap_stream_id']} rejected field(s) {ex.invalid_fields}, "
+                    f"retrying without them."
+                )
+                mark_fields_unsupported(stream, ex.invalid_fields)
 
     return counter

@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Union
 
 import pendulum
@@ -56,6 +57,34 @@ class ExportFailed(Exception):
     pass
 
 
+class InvalidFieldExportFailed(ExportFailed):
+    """Export failed because a field in the query doesn't exist on this tenant."""
+    def __init__(self, message: str, invalid_fields: List[str]):
+        super().__init__(message)
+        self.invalid_fields = invalid_fields
+
+
+_INVALID_FIELD_RE = re.compile(r"There is no field named (\w+(?:\.\w+)*)\.")
+
+
+def parse_invalid_fields(message: str) -> List[str]:
+    return [field_name.replace(".", "") for field_name in _INVALID_FIELD_RE.findall(message)]
+
+
+def parse_invalid_fields_from_response(resp) -> List[str]:
+    """Extracts invalid field names from a Zuora REST 400 {"Errors": [...]} body."""
+    try:
+        errors = resp.json().get("Errors", [])
+    except ValueError:
+        return []
+
+    invalid_fields = []
+    for error in errors:
+        if error.get("Code") == "INVALID_VALUE":
+            invalid_fields.extend(parse_invalid_fields(error.get("Message", "")))
+    return invalid_fields
+
+
 class ExportTimedOut(ExportFailed):
     def __init__(self, timeout: int, unit: str):
         super().__init__(f"Export failed (TimedOut): The job took longer than {timeout} {unit}")
@@ -87,6 +116,7 @@ class Aqua:
         "SmartPreventionAudit",
         "HpmCaptchaValidationResult",
         "EmailHistory",
+        "GatewayProfileData",
     ]
 
     @staticmethod
@@ -148,6 +178,20 @@ class Aqua:
         payload_content = {k: v for k, v in payload.items() if k in {"partner", "project", "incrementalTime"}}
         LOGGER.info(f"Submitting aqua request with {payload_content}")
         resp = client.aqua_request("POST", endpoint, json=payload).json()
+        if resp.get("message") == NO_DELETED_SUPPORT and any("deleted" in query for query in payload["queries"]):
+            LOGGER.warning(
+                "Stream %s does not support querying deleted records. Retrying without deleted-record "
+                "tracking; deletions will not be replicated for this stream.",
+                stream["tap_stream_id"],
+            )
+            payload = {
+                **payload,
+                "queries": [
+                    {key: value for key, value in query.items() if key != "deleted"}
+                    for query in payload["queries"]
+                ],
+            }
+            resp = client.aqua_request("POST", endpoint, json=payload).json()
         # Log to show whether the aqua response is in full or incremental
         # mode based on
         # https://knowledgecenter.zuora.com/DC_Developers/T_Aggregate_Query_API/B_Submit_Query/a_Export_Deleted_Data
@@ -194,7 +238,11 @@ class Aqua:
         if data["status"] == "completed":
             return True
         elif data["status"] == "failed":
-            raise ExportFailed(data["batches"][0]["message"])
+            message = data["batches"][0]["message"]
+            invalid_fields = parse_invalid_fields(message)
+            if invalid_fields:
+                raise InvalidFieldExportFailed(message, invalid_fields)
+            raise ExportFailed(message)
         else:
             return False
 
@@ -265,7 +313,11 @@ class Rest:
         if data["Status"] == "Completed":
             return True
         elif data["Status"] in ["Cancelled", "Failed"]:
-            raise ExportFailed(data["StatusReason"])
+            message = data["StatusReason"]
+            invalid_fields = parse_invalid_fields(message)
+            if invalid_fields:
+                raise InvalidFieldExportFailed(message, invalid_fields)
+            raise ExportFailed(message)
         else:
             return False
 
